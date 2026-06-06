@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Zen-Duo: High Interactive Playful Learning</title>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Sidebar Navigation (Takes less than 20% width) -->
+      <aside class="sidebar" id="app-sidebar">
+        <div class="brand">
+          <div class="brand-icon">ZD</div>
+          <span>Zen-Duo</span>
+        </div>
+        <nav class="nav-container">
+          <ul class="nav-menu">
+            <li class="nav-item active" id="nav-learn">
+              <button type="button">
+                <span class="nav-icon">🗺️</span>
+                <span>Learn Path</span>
+              </button>
+            </li>
+            <li class="nav-item" id="nav-sandbox">
+              <button type="button">
+                <span class="nav-icon">🎨</span>
+                <span>Curiosity Sandbox</span>
+              </button>
+            </li>
+            <li class="nav-item" id="nav-review">
+              <button type="button">
+                <span class="nav-icon">🔁</span>
+                <span>Auto Review</span>
+              </button>
+            </li>
+          </ul>
+        </nav>
+      </aside>
+
+      <!-- Mobile toggle menu -->
+      <button class="menu-toggle" id="mobile-menu-toggle" aria-label="Toggle Navigation">☰</button>
+
+      <!-- Main viewport area -->
+      <main class="main-content">
+        <div class="content-container">
+          <!-- Top bar with Streaks/Scores -->
+          <header class="top-bar">
+            <div class="stats-group">
+              <div class="stat-item streak" title="Day Streak">
+                <span>🔥</span> <span id="stat-streak-val">1</span>
+              </div>
+              <div class="stat-item hearts" title="Hearts Remaining">
+                <span>❤️</span> <span id="stat-hearts-val">5</span>
+              </div>
+              <div class="stat-item xp" title="Total XP Points">
+                <span>⭐</span> <span id="stat-xp-val">0</span>
+              </div>
+            </div>
+            <div class="stats-group">
+              <!-- Dark mode toggle -->
+              <button type="button" class="btn-3d btn-outline" id="theme-toggle" style="padding: 8px 12px; font-size: 14px;">
+                <span>🌙</span>
+              </button>
+            </div>
+          </header>
+
+          <!-- Dynamic view container -->
+          <div id="view-container"></div>
+        </div>
+      </main>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
