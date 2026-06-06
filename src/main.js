@@ -420,6 +420,9 @@ function resetChallengeState() {
   state.matchingPairsRightSelected = null;
   state.matchedPairsCount = 0;
   state.sentenceBuilderAnswers = [];
+  state.yesNoSelection = null;
+  state.dragSortAnswers = {};
+  state.fillBlankSelection = null;
   state.isChecking = false;
   state.isCorrect = false;
 }
@@ -481,6 +484,12 @@ function renderLessonView() {
     renderListeningChallenge(challenge, contentArea, submitBtn);
   } else if (challenge.type === 'builder') {
     renderBuilderChallenge(challenge, contentArea, submitBtn);
+  } else if (challenge.type === 'yes-no') {
+    renderYesNoChallenge(challenge, contentArea, submitBtn);
+  } else if (challenge.type === 'drag-sort') {
+    renderDragSortChallenge(challenge, contentArea, submitBtn);
+  } else if (challenge.type === 'fill-blank') {
+    renderFillBlankChallenge(challenge, contentArea, submitBtn);
   }
 
   // Speak challenge instruction with a small delay for child guidance
@@ -896,6 +905,389 @@ function renderBuilderChallenge(challenge, container, submitBtn) {
   container.appendChild(builderWrapper);
 }
 
+// Yes or No challenge renderer
+function renderYesNoChallenge(challenge, container, submitBtn) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'yes-no-challenge';
+  wrapper.style.display = 'flex';
+  wrapper.style.flexDirection = 'column';
+  wrapper.style.alignItems = 'center';
+  wrapper.style.gap = '20px';
+  wrapper.style.width = '100%';
+
+  const emojiEl = document.createElement('div');
+  emojiEl.style.fontSize = '80px';
+  emojiEl.style.userSelect = 'none';
+  emojiEl.innerText = challenge.emoji;
+
+  const speaker = document.createElement('button');
+  speaker.type = 'button';
+  speaker.className = 'speaker-btn';
+  speaker.innerHTML = '🔊 Hear Word';
+  speaker.addEventListener('click', () => {
+    playSound('click');
+    speak(challenge.audioText);
+  });
+
+  const buttonsRow = document.createElement('div');
+  buttonsRow.className = 'yes-no-row';
+  buttonsRow.style.display = 'flex';
+  buttonsRow.style.gap = '24px';
+  buttonsRow.style.width = '100%';
+  buttonsRow.style.justifyContent = 'center';
+
+  const yesBtn = document.createElement('button');
+  yesBtn.type = 'button';
+  yesBtn.className = 'btn-3d yes-btn';
+  yesBtn.style.flex = '1';
+  yesBtn.style.maxWidth = '160px';
+  yesBtn.style.setProperty('--btn-bg', '#10B981');
+  yesBtn.style.setProperty('--btn-border', '#059669');
+  yesBtn.style.setProperty('--btn-shadow', '#047857');
+  yesBtn.style.setProperty('--btn-text', '#ffffff');
+  yesBtn.innerHTML = '<span>🟢 YES</span>';
+
+  const noBtn = document.createElement('button');
+  noBtn.type = 'button';
+  noBtn.className = 'btn-3d no-btn';
+  noBtn.style.flex = '1';
+  noBtn.style.maxWidth = '160px';
+  noBtn.style.setProperty('--btn-bg', '#EF4444');
+  noBtn.style.setProperty('--btn-border', '#DC2626');
+  noBtn.style.setProperty('--btn-shadow', '#B91C1C');
+  noBtn.style.setProperty('--btn-text', '#ffffff');
+  noBtn.innerHTML = '<span>🔴 NO</span>';
+
+  yesBtn.addEventListener('click', () => {
+    if (state.isChecking) return;
+    playSound('click');
+    yesBtn.style.outline = '4px solid #047857';
+    noBtn.style.outline = 'none';
+    state.yesNoSelection = 'yes';
+    submitBtn.removeAttribute('disabled');
+  });
+
+  noBtn.addEventListener('click', () => {
+    if (state.isChecking) return;
+    playSound('click');
+    noBtn.style.outline = '4px solid #B91C1C';
+    yesBtn.style.outline = 'none';
+    state.yesNoSelection = 'no';
+    submitBtn.removeAttribute('disabled');
+  });
+
+  wrapper.appendChild(emojiEl);
+  wrapper.appendChild(speaker);
+  wrapper.appendChild(buttonsRow);
+  buttonsRow.appendChild(yesBtn);
+  buttonsRow.appendChild(noBtn);
+  container.appendChild(wrapper);
+
+  setTimeout(() => {
+    if (state.activeView === 'lesson') {
+      speak(challenge.audioText);
+    }
+  }, 700);
+}
+
+// Drag to Sort challenge renderer
+function renderDragSortChallenge(challenge, container, submitBtn) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'drag-sort-challenge';
+  wrapper.style.display = 'flex';
+  wrapper.style.flexDirection = 'column';
+  wrapper.style.alignItems = 'center';
+  wrapper.style.gap = '20px';
+  wrapper.style.width = '100%';
+
+  const bucketsContainer = document.createElement('div');
+  bucketsContainer.style.display = 'flex';
+  bucketsContainer.style.gap = '20px';
+  bucketsContainer.style.width = '100%';
+  bucketsContainer.style.justifyContent = 'center';
+  bucketsContainer.style.flexWrap = 'wrap';
+
+  const bucketEls = {};
+  challenge.buckets.forEach(bucket => {
+    const bEl = document.createElement('div');
+    bEl.className = 'sort-bucket';
+    bEl.dataset.id = bucket.id;
+    bEl.style.flex = '1';
+    bEl.style.minWidth = '140px';
+    bEl.style.minHeight = '140px';
+    bEl.style.border = '3px dashed var(--border-color)';
+    bEl.style.borderRadius = '16px';
+    bEl.style.padding = '12px';
+    bEl.style.display = 'flex';
+    bEl.style.flexDirection = 'column';
+    bEl.style.alignItems = 'center';
+    bEl.style.backgroundColor = 'var(--bg-card)';
+    bEl.style.transition = 'all 0.2s ease';
+
+    const title = document.createElement('div');
+    title.style.fontWeight = '800';
+    title.style.fontSize = '16px';
+    title.style.marginBottom = '8px';
+    title.style.userSelect = 'none';
+    title.innerText = `${bucket.emoji} ${bucket.name}`;
+
+    const itemsContainer = document.createElement('div');
+    itemsContainer.className = 'bucket-items';
+    itemsContainer.style.display = 'flex';
+    itemsContainer.style.flexWrap = 'wrap';
+    itemsContainer.style.gap = '6px';
+    itemsContainer.style.width = '100%';
+    itemsContainer.style.minHeight = '60px';
+    itemsContainer.style.justifyContent = 'center';
+
+    bEl.appendChild(title);
+    bEl.appendChild(itemsContainer);
+    bucketsContainer.appendChild(bEl);
+    bucketEls[bucket.id] = bEl;
+  });
+
+  const pool = document.createElement('div');
+  pool.className = 'sort-pool';
+  pool.style.display = 'flex';
+  pool.style.flexWrap = 'wrap';
+  pool.style.gap = '10px';
+  pool.style.padding = '16px';
+  pool.style.backgroundColor = 'var(--bg-color)';
+  pool.style.borderRadius = '16px';
+  pool.style.width = '100%';
+  pool.style.minHeight = '80px';
+  pool.style.justifyContent = 'center';
+  pool.style.alignItems = 'center';
+
+  challenge.items.forEach((item, idx) => {
+    const itemEl = document.createElement('button');
+    itemEl.type = 'button';
+    itemEl.className = 'word-block';
+    itemEl.innerText = `${item.emoji} ${item.text}`;
+    itemEl.dataset.idx = idx;
+    itemEl.style.touchAction = 'none';
+
+    itemEl.addEventListener('pointerdown', (e) => {
+      if (state.isChecking) return;
+      itemEl.setPointerCapture(e.pointerId);
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      let dragClone = null;
+      let hasDragged = false;
+
+      const onPointerMove = (moveEvent) => {
+        if (state.isChecking) return;
+        const dx = moveEvent.clientX - startX;
+        const dy = moveEvent.clientY - startY;
+
+        if (!hasDragged && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+          hasDragged = true;
+
+          dragClone = document.createElement('div');
+          dragClone.className = 'word-block dragging-ghost';
+          dragClone.innerText = itemEl.innerText;
+          dragClone.style.position = 'fixed';
+          dragClone.style.zIndex = '9999';
+          dragClone.style.pointerEvents = 'none';
+          dragClone.style.opacity = '0.9';
+          dragClone.style.boxShadow = '0 8px 20px rgba(0,0,0,0.15)';
+          dragClone.style.transform = 'scale(1.05)';
+
+          const rect = itemEl.getBoundingClientRect();
+          dragClone.style.width = `${rect.width}px`;
+          dragClone.style.height = `${rect.height}px`;
+          document.body.appendChild(dragClone);
+        }
+
+        if (dragClone) {
+          const rect = itemEl.getBoundingClientRect();
+          dragClone.style.left = `${moveEvent.clientX - rect.width / 2}px`;
+          dragClone.style.top = `${moveEvent.clientY - rect.height / 2}px`;
+
+          challenge.buckets.forEach(bucket => {
+            const bEl = bucketEls[bucket.id];
+            const bRect = bEl.getBoundingClientRect();
+            const isOver = (
+              moveEvent.clientX >= bRect.left &&
+              moveEvent.clientX <= bRect.right &&
+              moveEvent.clientY >= bRect.top &&
+              moveEvent.clientY <= bRect.bottom
+            );
+            if (isOver) {
+              bEl.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
+              bEl.style.borderColor = 'var(--primary-color)';
+            } else {
+              bEl.style.backgroundColor = 'var(--bg-card)';
+              bEl.style.borderColor = 'var(--border-color)';
+            }
+          });
+        }
+      };
+
+      const onPointerUp = (upEvent) => {
+        itemEl.releasePointerCapture(e.pointerId);
+        itemEl.removeEventListener('pointermove', onPointerMove);
+        itemEl.removeEventListener('pointerup', onPointerUp);
+
+        if (dragClone) {
+          dragClone.remove();
+        }
+
+        challenge.buckets.forEach(bucket => {
+          const bEl = bucketEls[bucket.id];
+          bEl.style.backgroundColor = 'var(--bg-card)';
+          bEl.style.borderColor = 'var(--border-color)';
+        });
+
+        if (state.isChecking) return;
+
+        if (hasDragged) {
+          let hitBucketId = null;
+          challenge.buckets.forEach(bucket => {
+            const bEl = bucketEls[bucket.id];
+            const bRect = bEl.getBoundingClientRect();
+            const isOver = (
+              upEvent.clientX >= bRect.left &&
+              upEvent.clientX <= bRect.right &&
+              upEvent.clientY >= bRect.top &&
+              upEvent.clientY <= bRect.bottom
+            );
+            if (isOver) hitBucketId = bucket.id;
+          });
+
+          if (hitBucketId) {
+            playSound('click');
+            bucketEls[hitBucketId].querySelector('.bucket-items').appendChild(itemEl);
+            state.dragSortAnswers[idx] = hitBucketId;
+            speak(item.text);
+            checkAllItemsSorted();
+          } else {
+            pool.appendChild(itemEl);
+            delete state.dragSortAnswers[idx];
+            checkAllItemsSorted();
+          }
+        } else {
+          playSound('click');
+          speak(item.text);
+          if (itemEl.parentElement === pool) {
+            const firstBucketId = challenge.buckets[0].id;
+            bucketEls[firstBucketId].querySelector('.bucket-items').appendChild(itemEl);
+            state.dragSortAnswers[idx] = firstBucketId;
+          } else {
+            pool.appendChild(itemEl);
+            delete state.dragSortAnswers[idx];
+          }
+          checkAllItemsSorted();
+        }
+      };
+
+      itemEl.addEventListener('pointermove', onPointerMove);
+      itemEl.addEventListener('pointerup', onPointerUp);
+    });
+
+    pool.appendChild(itemEl);
+  });
+
+  function checkAllItemsSorted() {
+    const sortedCount = Object.keys(state.dragSortAnswers).length;
+    if (sortedCount === challenge.items.length) {
+      submitBtn.removeAttribute('disabled');
+    } else {
+      submitBtn.setAttribute('disabled', 'true');
+    }
+  }
+
+  wrapper.appendChild(bucketsContainer);
+  wrapper.appendChild(pool);
+  container.appendChild(wrapper);
+}
+
+// Fill in the Blank challenge renderer
+function renderFillBlankChallenge(challenge, container, submitBtn) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'fill-blank-challenge';
+  wrapper.style.display = 'flex';
+  wrapper.style.flexDirection = 'column';
+  wrapper.style.alignItems = 'center';
+  wrapper.style.gap = '24px';
+  wrapper.style.width = '100%';
+
+  const sentenceRow = document.createElement('div');
+  sentenceRow.style.fontSize = '24px';
+  sentenceRow.style.fontWeight = '800';
+  sentenceRow.style.display = 'flex';
+  sentenceRow.style.alignItems = 'center';
+  sentenceRow.style.gap = '8px';
+  sentenceRow.style.justifyContent = 'center';
+  sentenceRow.style.margin = '20px 0';
+
+  const beforeText = document.createElement('span');
+  beforeText.innerText = challenge.sentenceBefore;
+
+  const blankSlot = document.createElement('span');
+  blankSlot.className = 'blank-slot';
+  blankSlot.style.minWidth = '80px';
+  blankSlot.style.borderBottom = '3px solid var(--border-color)';
+  blankSlot.style.textAlign = 'center';
+  blankSlot.style.color = 'var(--primary-color)';
+  blankSlot.style.padding = '0 8px';
+  blankSlot.innerText = '_____';
+
+  const afterText = document.createElement('span');
+  afterText.innerText = challenge.sentenceAfter;
+
+  sentenceRow.appendChild(beforeText);
+  sentenceRow.appendChild(blankSlot);
+  sentenceRow.appendChild(afterText);
+
+  const speaker = document.createElement('button');
+  speaker.type = 'button';
+  speaker.className = 'speaker-btn';
+  speaker.innerHTML = '🔊 Hear Sentence';
+  speaker.style.marginBottom = '10px';
+  speaker.addEventListener('click', () => {
+    playSound('click');
+    speak(`${challenge.sentenceBefore} ${challenge.answer} ${challenge.sentenceAfter}`);
+  });
+
+  const pool = document.createElement('div');
+  pool.style.display = 'flex';
+  pool.style.gap = '12px';
+  pool.style.justifyContent = 'center';
+
+  challenge.options.forEach(word => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'word-block';
+    btn.innerText = word;
+
+    btn.addEventListener('click', () => {
+      if (state.isChecking) return;
+      playSound('click');
+      speak(word);
+
+      pool.querySelectorAll('.word-block').forEach(b => {
+        b.style.outline = 'none';
+        b.style.borderColor = 'var(--border-color)';
+      });
+      btn.style.outline = '4px solid var(--primary-color)';
+      btn.style.borderColor = 'var(--primary-color)';
+
+      blankSlot.innerText = word;
+      state.fillBlankSelection = word;
+      submitBtn.removeAttribute('disabled');
+    });
+
+    pool.appendChild(btn);
+  });
+
+  wrapper.appendChild(sentenceRow);
+  wrapper.appendChild(speaker);
+  wrapper.appendChild(pool);
+  container.appendChild(wrapper);
+}
+
 // Verify answer
 function checkChallengeAnswer() {
   const challenge = state.currentLesson.challenges[state.currentChallengeIdx];
@@ -939,6 +1331,59 @@ function checkChallengeAnswer() {
       helper.style.marginTop = '8px';
       helper.innerText = `Correct: "${challenge.targetText}"`;
       document.querySelector('.sentence-builder').appendChild(helper);
+    }
+  } else if (challenge.type === 'yes-no') {
+    isCorrect = state.yesNoSelection === challenge.answer;
+    
+    const yesBtn = document.querySelector('.yes-btn');
+    const noBtn = document.querySelector('.no-btn');
+    if (yesBtn && noBtn) {
+      if (challenge.answer === 'yes') {
+        yesBtn.style.border = '4px solid var(--primary-color)';
+        if (state.yesNoSelection === 'no') {
+          noBtn.style.border = '4px solid var(--red-color)';
+        }
+      } else {
+        noBtn.style.border = '4px solid var(--primary-color)';
+        if (state.yesNoSelection === 'yes') {
+          yesBtn.style.border = '4px solid var(--red-color)';
+        }
+      }
+    }
+  } else if (challenge.type === 'drag-sort') {
+    isCorrect = challenge.items.every((item, idx) => state.dragSortAnswers[idx] === item.bucket);
+    
+    document.querySelectorAll('.sort-bucket').forEach(bEl => {
+      const bucketId = bEl.dataset.id;
+      bEl.querySelectorAll('.word-block').forEach(itemEl => {
+        const itemIdx = parseInt(itemEl.dataset.idx);
+        const correctBucket = challenge.items[itemIdx].bucket;
+        if (bucketId === correctBucket) {
+          itemEl.classList.add('correct');
+        } else {
+          itemEl.classList.add('incorrect');
+        }
+      });
+    });
+  } else if (challenge.type === 'fill-blank') {
+    isCorrect = state.fillBlankSelection === challenge.answer;
+    
+    const blankSlot = document.querySelector('.blank-slot');
+    if (blankSlot) {
+      if (isCorrect) {
+        blankSlot.style.color = 'var(--primary-color)';
+        blankSlot.style.borderBottomColor = 'var(--primary-color)';
+      } else {
+        blankSlot.style.color = 'var(--red-color)';
+        blankSlot.style.borderBottomColor = 'var(--red-color)';
+        
+        const helper = document.createElement('div');
+        helper.style.color = 'var(--primary-color)';
+        helper.style.fontWeight = 'bold';
+        helper.style.marginTop = '8px';
+        helper.innerText = `Correct: "${challenge.answer}"`;
+        document.querySelector('.fill-blank-challenge').appendChild(helper);
+      }
     }
   }
   
@@ -1256,6 +1701,28 @@ async function initDynamicVocabulary() {
             if (!seen.has(cleanWord.toLowerCase())) {
               seen.add(cleanWord.toLowerCase());
               list.push({ word: cleanWord, emoji: opt.emoji, val: '' });
+            }
+          });
+        } else if (challenge.type === 'yes-no') {
+          const cleanWord = challenge.audioText.trim();
+          if (!seen.has(cleanWord.toLowerCase())) {
+            seen.add(cleanWord.toLowerCase());
+            list.push({ word: cleanWord, emoji: challenge.emoji, val: '' });
+          }
+        } else if (challenge.type === 'drag-sort') {
+          challenge.items.forEach(item => {
+            const cleanWord = item.text.trim();
+            if (!seen.has(cleanWord.toLowerCase())) {
+              seen.add(cleanWord.toLowerCase());
+              list.push({ word: cleanWord, emoji: item.emoji, val: '' });
+            }
+          });
+        } else if (challenge.type === 'fill-blank') {
+          challenge.options.forEach(word => {
+            const cleanWord = word.trim();
+            if (!seen.has(cleanWord.toLowerCase())) {
+              seen.add(cleanWord.toLowerCase());
+              list.push({ word: cleanWord, emoji: '💡', val: '' });
             }
           });
         }
