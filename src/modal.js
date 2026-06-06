@@ -89,6 +89,26 @@ export function showModal(type, data = {}) {
         container.classList.remove('visible');
         resolve(true);
       });
+    } else if (type === 'curiosity-unlocked') {
+      const { catName = 'New World', emoji = '🦖' } = data;
+      container.innerHTML = `
+        <div class="modal-card bounce-in">
+          <div class="modal-mascot-container">
+            ${getZenSVG('excited')}
+          </div>
+          <h1 class="modal-title animate-rainbow" style="font-size: 24px;">Curiosity Unlocked!</h1>
+          <p class="modal-body-text" style="font-size: 16px;">
+            Wow! You are super curious about <strong>${catName}</strong> ${emoji}!
+            I have built a special, custom level for you on the map!
+          </p>
+          <button type="button" class="btn-3d btn-primary btn-large" id="modal-action-btn">Let's Explore!</button>
+        </div>
+      `;
+
+      document.getElementById('modal-action-btn').addEventListener('click', () => {
+        container.classList.remove('visible');
+        resolve(true);
+      });
     }
   });
 }

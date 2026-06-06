@@ -1,6 +1,6 @@
 import './style.css';
 import confetti from 'canvas-confetti';
-import { LEVELS } from './lessons.js';
+import { LEVELS as staticLevels } from './lessons.js';
 import { speak } from './tts.js';
 import { translate, generateSVG } from './translate.js';
 import { showModal } from './modal.js';
@@ -9,7 +9,43 @@ import { registerSW } from 'virtual:pwa-register';
 
 registerSW({ immediate: true });
 
-// --- State Management ---
+// --- Smart Learning Engine Configuration & State ---
+const CURIOSITY_CATEGORIES = {
+  dinosaur: {
+    name: "Dinosaur World",
+    emoji: "🦖",
+    keywords: ["dinosaur", "trex", "t-rex", "raptor", "volcano", "fossil", "dino", "egg"],
+    words: [
+      { text: "T-Rex", emoji: "🦖" },
+      { text: "Volcano", emoji: "🌋" },
+      { text: "Egg", emoji: "🥚" },
+      { text: "Fossil", emoji: "🦴" }
+    ]
+  },
+  space: {
+    name: "Space Odyssey",
+    emoji: "🚀",
+    keywords: ["space", "rocket", "star", "moon", "planet", "alien", "astronaut", "mars", "sun"],
+    words: [
+      { text: "Rocket", emoji: "🚀" },
+      { text: "Moon", emoji: "🌙" },
+      { text: "Alien", emoji: "👽" },
+      { text: "Planet", emoji: "🪐" }
+    ]
+  },
+  ocean: {
+    name: "Deep Ocean",
+    emoji: "🐙",
+    keywords: ["ocean", "shark", "whale", "fish", "octopus", "coral", "submarine", "sea", "crab"],
+    words: [
+      { text: "Shark", emoji: "🦈" },
+      { text: "Whale", emoji: "🐋" },
+      { text: "Octopus", emoji: "🐙" },
+      { text: "Crab", emoji: "🦀" }
+    ]
+  }
+};
+
 const state = {
   xp: parseInt(localStorage.getItem('zd_xp')) || 0,
   hearts: 5,
@@ -28,8 +64,23 @@ const state = {
   isCorrect: false,
   reviewTimer: null,
   reviewIdx: 0,
-  incorrectInARow: 0
+  incorrectInARow: 0,
+  
+  // Smart learning engine states
+  wordStats: JSON.parse(localStorage.getItem('zd_word_stats')) || {},
+  rollingResults: JSON.parse(localStorage.getItem('zd_rolling_results')) || [],
+  difficulty: localStorage.getItem('zd_difficulty') || 'medium',
+  sessionMistakes: [],
+  fixItLesson: JSON.parse(localStorage.getItem('zd_fix_it_lesson')) || null,
+  sandboxHistory: JSON.parse(localStorage.getItem('zd_sandbox_history')) || [],
+  customLevels: JSON.parse(localStorage.getItem('zd_custom_levels')) || []
 };
+
+let LEVELS = [...staticLevels, ...(state.customLevels || [])];
+
+function updateDynamicLevels() {
+  LEVELS = [...staticLevels, ...(state.customLevels || [])];
+}
 
 // --- Save State Helper ---
 function saveState() {
@@ -37,6 +88,100 @@ function saveState() {
   localStorage.setItem('zd_streak', state.streak);
   localStorage.setItem('zd_unlocked_level', state.unlockedLevelId);
   localStorage.setItem('zd_completed_lessons', JSON.stringify(state.completedLessons));
+  localStorage.setItem('zd_word_stats', JSON.stringify(state.wordStats));
+  localStorage.setItem('zd_rolling_results', JSON.stringify(state.rollingResults));
+  localStorage.setItem('zd_difficulty', state.difficulty);
+  localStorage.setItem('zd_fix_it_lesson', JSON.stringify(state.fixItLesson));
+  localStorage.setItem('zd_sandbox_history', JSON.stringify(state.sandboxHistory));
+  localStorage.setItem('zd_custom_levels', JSON.stringify(state.customLevels));
+}
+
+// --- Smart Learning Engine Helpers ---
+function trackWordPerformance(word, emoji, isCorrect) {
+  if (!word) return;
+  const key = word.toLowerCase().trim();
+  if (!state.wordStats[key]) {
+    state.wordStats[key] = { attempts: 0, correct: 0, score: 3, lastSeen: 0 };
+  }
+  const stats = state.wordStats[key];
+  stats.attempts++;
+  if (isCorrect) {
+    stats.correct++;
+  }
+  
+  // Leitner score rating (1-5 stars)
+  if (isCorrect) {
+    stats.score = Math.min(5, stats.score + 1);
+  } else {
+    stats.score = Math.max(1, stats.score - 1);
+    
+    // Add to session mistakes for Fix It lesson if not already present
+    if (!state.sessionMistakes.some(m => m.word.toLowerCase() === key)) {
+      state.sessionMistakes.push({ word, emoji: emoji || '💡' });
+    }
+  }
+  stats.lastSeen = Date.now();
+  saveState();
+}
+
+function checkCuriosityUnlock(word) {
+  const clean = word.toLowerCase().trim();
+  if (!state.sandboxHistory.includes(clean)) {
+    state.sandboxHistory.push(clean);
+  }
+  
+  for (const [catId, cat] of Object.entries(CURIOSITY_CATEGORIES)) {
+    if (state.customLevels.some(l => l.catId === catId)) continue;
+    
+    const matchedHistory = state.sandboxHistory.filter(w => cat.keywords.includes(w));
+    if (matchedHistory.length >= 3) {
+      // Build a dynamic level structure
+      const newLevelId = LEVELS.length + 1;
+      const newLevel = {
+        id: newLevelId,
+        catId: catId,
+        title: `Curiosity: ${cat.name}`,
+        icon: cat.emoji,
+        lessons: [
+          {
+            id: `curiosity_${catId}_1`,
+            title: `${cat.name} Explorers`,
+            challenges: [
+              {
+                type: "matching",
+                instruction: `Match the ${cat.name} elements!`,
+                pairs: cat.words.reduce((acc, w) => { acc[w.text] = w.emoji; return acc; }, {})
+              },
+              {
+                type: "yes-no",
+                instruction: `Is this a ${cat.words[0].text}?`,
+                emoji: cat.words[0].emoji,
+                audioText: cat.words[0].text,
+                answer: "yes"
+              },
+              {
+                type: "choice",
+                instruction: `Find the ${cat.words[1].text}!`,
+                options: cat.words.map(w => ({ text: w.text, emoji: w.emoji })),
+                answer: cat.words[1].text
+              }
+            ]
+          }
+        ]
+      };
+      
+      state.customLevels.push(newLevel);
+      updateDynamicLevels();
+      saveState();
+      
+      setTimeout(async () => {
+        await showModal('curiosity-unlocked', { catName: cat.name, emoji: cat.emoji });
+        if (state.activeView === 'learn') {
+          renderMapView();
+        }
+      }, 1200);
+    }
+  }
 }
 
 // --- Audio Playback Helpers ---
@@ -373,6 +518,29 @@ function renderLearnView() {
     mapContainer.appendChild(nodeWrapper);
   });
   
+  if (state.fixItLesson) {
+    const nodeWrapper = document.createElement('div');
+    nodeWrapper.className = 'map-node-container';
+    
+    const node = document.createElement('button');
+    node.type = 'button';
+    node.className = 'map-node-fixit active';
+    node.innerHTML = `<span>🩹</span>`;
+    
+    node.addEventListener('click', () => {
+      startLesson(state.fixItLesson);
+    });
+    
+    const label = document.createElement('div');
+    label.className = 'node-label';
+    label.style.color = '#EF4444';
+    label.innerText = 'Fix It!';
+    
+    nodeWrapper.appendChild(node);
+    nodeWrapper.appendChild(label);
+    mapContainer.appendChild(nodeWrapper);
+  }
+  
   if (!window.hasPathMapResizeListener) {
     window.addEventListener('resize', () => {
       if (state.activeView === 'learn') {
@@ -505,7 +673,21 @@ function renderChoiceChallenge(challenge, container, submitBtn) {
   const grid = document.createElement('div');
   grid.className = 'options-grid';
   
-  challenge.options.forEach(option => {
+  let options = [...challenge.options];
+  if (state.difficulty === 'easy') {
+    const correctOpt = options.find(o => o.text === challenge.answer);
+    const distractors = options.filter(o => o.text !== challenge.answer);
+    options = [correctOpt, distractors[0]].filter(Boolean);
+  } else if (state.difficulty === 'hard' && options.length < 4) {
+    const extraDistractors = ["Dog", "Cat", "Fish", "Apple", "Banana", "Milk", "Water", "Chair", "Table"]
+      .filter(w => w !== challenge.answer && !options.some(o => o.text === w));
+    if (extraDistractors.length > 0) {
+      options.push({ text: extraDistractors[0], emoji: '💡' });
+    }
+  }
+  options.sort(() => Math.random() - 0.5);
+  
+  options.forEach(option => {
     const card = document.createElement('div');
     card.className = 'option-card';
     card.innerHTML = `
@@ -648,7 +830,21 @@ function renderListeningChallenge(challenge, container, submitBtn) {
   grid.className = 'options-grid';
   grid.style.width = '100%';
   
-  challenge.options.forEach(option => {
+  let options = [...challenge.options];
+  if (state.difficulty === 'easy') {
+    const correctOpt = options.find(o => o.text === challenge.answer);
+    const distractors = options.filter(o => o.text !== challenge.answer);
+    options = [correctOpt, distractors[0]].filter(Boolean);
+  } else if (state.difficulty === 'hard' && options.length < 4) {
+    const extraDistractors = ["Dog", "Cat", "Fish", "Apple", "Banana", "Milk", "Water", "Chair", "Table"]
+      .filter(w => w !== challenge.answer && !options.some(o => o.text === w));
+    if (extraDistractors.length > 0) {
+      options.push({ text: extraDistractors[0], emoji: '💡' });
+    }
+  }
+  options.sort(() => Math.random() - 0.5);
+  
+  options.forEach(option => {
     const card = document.createElement('div');
     card.className = 'option-card';
     card.innerHTML = `
@@ -691,7 +887,21 @@ function renderBuilderChallenge(challenge, container, submitBtn) {
   const pool = document.createElement('div');
   pool.className = 'word-pool';
   
-  challenge.blocks.forEach((word, idx) => {
+  let blocks = [...challenge.blocks];
+  const targetWords = challenge.targetText.split(' ').map(w => w.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"").toLowerCase());
+  
+  if (state.difficulty === 'easy') {
+    blocks = blocks.filter(b => targetWords.includes(b.toLowerCase()));
+  } else if (state.difficulty === 'hard') {
+    const potentialDistractors = ["the", "a", "is", "runs", "flies", "swims", "happy", "big", "small"];
+    potentialDistractors.forEach(dist => {
+      if (!blocks.map(b => b.toLowerCase()).includes(dist) && !targetWords.includes(dist) && blocks.length < 7) {
+        blocks.push(dist);
+      }
+    });
+  }
+  
+  blocks.forEach((word, idx) => {
     const block = document.createElement('button');
     block.type = 'button';
     block.className = 'word-block';
@@ -1387,6 +1597,45 @@ function checkChallengeAnswer() {
     }
   }
   
+  // Smart Learning Engine: Track word performance based on challenge type
+  if (challenge.type === 'matching') {
+    Object.entries(challenge.pairs).forEach(([w, em]) => {
+      trackWordPerformance(w, em, true);
+    });
+  } else if (challenge.type === 'choice' || challenge.type === 'listening') {
+    const opt = challenge.options.find(o => o.text === challenge.answer);
+    trackWordPerformance(challenge.answer, opt ? opt.emoji : '💡', isCorrect);
+  } else if (challenge.type === 'yes-no') {
+    trackWordPerformance(challenge.audioText, challenge.emoji, isCorrect);
+  } else if (challenge.type === 'builder') {
+    trackWordPerformance(challenge.targetText, '✍️', isCorrect);
+  } else if (challenge.type === 'drag-sort') {
+    challenge.items.forEach(item => {
+      const itemIdx = challenge.items.findIndex(it => it.text === item.text);
+      const isItemCorrect = state.dragSortAnswers[itemIdx] === item.bucket;
+      trackWordPerformance(item.text, item.emoji, isItemCorrect);
+    });
+  } else if (challenge.type === 'fill-blank') {
+    trackWordPerformance(challenge.answer, '💡', isCorrect);
+  }
+
+  state.rollingResults.push(isCorrect);
+  if (state.rollingResults.length > 5) {
+    state.rollingResults.shift();
+  }
+  if (state.rollingResults.length >= 3) {
+    const correctCount = state.rollingResults.filter(Boolean).length;
+    const rate = correctCount / state.rollingResults.length;
+    if (rate >= 0.8) {
+      state.difficulty = 'hard';
+    } else if (rate <= 0.4) {
+      state.difficulty = 'easy';
+    } else {
+      state.difficulty = 'medium';
+    }
+  }
+  saveState();
+
   state.isChecking = true;
   state.isCorrect = isCorrect;
   
@@ -1448,20 +1697,52 @@ function nextChallenge() {
     });
     
     state.xp += 10;
-    if (!state.completedLessons.includes(lesson.id)) {
-      state.completedLessons.push(lesson.id);
+    let earnedFixIt = false;
+    
+    if (lesson.isFixIt) {
+      state.fixItLesson = null;
+    } else {
+      if (!state.completedLessons.includes(lesson.id)) {
+        state.completedLessons.push(lesson.id);
+      }
+      
+      const currentLevel = LEVELS.find(l => l.lessons.some(les => les.id === lesson.id));
+      if (currentLevel) {
+        const allLevelLessonsDone = currentLevel.lessons.every(les => state.completedLessons.includes(les.id));
+        if (allLevelLessonsDone && currentLevel.id === state.unlockedLevelId && state.unlockedLevelId < LEVELS.length) {
+          state.unlockedLevelId++;
+        }
+      }
+
+      if (state.sessionMistakes.length >= 3) {
+        state.fixItLesson = {
+          id: "fix_it",
+          title: "🩹 Fix It! Mistake Review",
+          isFixIt: true,
+          challenges: state.sessionMistakes.map(mistake => {
+            return {
+              type: "choice",
+              instruction: `Let's practice: ${mistake.word}!`,
+              options: [
+                { text: mistake.word, emoji: mistake.emoji },
+                { text: mistake.word === 'Dog' ? 'Cat' : 'Dog', emoji: mistake.word === 'Dog' ? '🐱' : '🐶' }
+              ],
+              answer: mistake.word
+            };
+          })
+        };
+        earnedFixIt = true;
+      }
     }
     
-    // Unlock next level if all level lessons complete
-    const currentLevel = LEVELS.find(l => l.lessons.some(les => les.id === lesson.id));
-    const allLevelLessonsDone = currentLevel.lessons.every(les => state.completedLessons.includes(les.id));
-    if (allLevelLessonsDone && currentLevel.id === state.unlockedLevelId && state.unlockedLevelId < LEVELS.length) {
-      state.unlockedLevelId++;
-    }
-    
+    state.sessionMistakes = [];
     saveState();
+    
     setTimeout(async () => {
       await showModal('lesson-complete', { xp: 10, hearts: state.hearts });
+      if (earnedFixIt) {
+        speak("Hãy sửa các lỗi sai nhé!");
+      }
       switchView('learn');
     }, 500);
   }
@@ -1584,6 +1865,7 @@ function renderSandboxView() {
     // 1. Instantly speak the English word
     speak(cleanWord);
     titleEl.innerText = cleanWord;
+    checkCuriosityUnlock(cleanWord);
     
     // 2. Fetch OCR translation to Vietnamese
     transEl.innerText = "Translating...";
@@ -1766,10 +2048,11 @@ function renderReviewView() {
       <h2>Auto Review Slideshow</h2>
       <p style="color: var(--text-light); max-width: 480px;">A passive background slideshow. Sit back and absorb terms automatically as the system loops through lessons.</p>
       
-      <div class="sandbox-canvas" style="min-height: 300px; cursor: pointer; width:100%; max-width: 440px;" id="slideshow-trigger">
+      <div class="sandbox-canvas" style="min-height: 320px; cursor: pointer; width:100%; max-width: 440px;" id="slideshow-trigger">
         <div id="slideshow-visual" style="font-size: 96px; transition: transform 0.3s ease;">🐶</div>
         <h2 id="slideshow-word" style="font-size: 36px; font-weight: 700; margin-top: 16px;">Dog</h2>
         <h3 id="slideshow-trans" style="color: var(--primary-color); font-weight:600;">"Con chó"</h3>
+        <div id="slideshow-stars" style="font-size: 20px; margin-top: 10px; color: #F59E0B; letter-spacing: 2px;">⭐⭐⭐☆☆</div>
       </div>
       
       <button type="button" class="btn-3d btn-primary" id="slideshow-play-pause">Pause Slideshow</button>
@@ -1779,18 +2062,55 @@ function renderReviewView() {
   const visualEl = document.getElementById('slideshow-visual');
   const wordEl = document.getElementById('slideshow-word');
   const transEl = document.getElementById('slideshow-trans');
+  const starsEl = document.getElementById('slideshow-stars');
   const playBtn = document.getElementById('slideshow-play-pause');
   const triggerEl = document.getElementById('slideshow-trigger');
 
-  state.reviewIdx = 0;
   let isPlaying = true;
 
+  function getLeitnerPriority(item) {
+    const key = item.word.toLowerCase().trim();
+    const stats = state.wordStats[key];
+    if (!stats) return 3;
+    
+    const score = stats.score || 3;
+    let weight = 6 - score;
+    
+    const timeSinceLastSeen = Date.now() - (stats.lastSeen || 0);
+    if (timeSinceLastSeen < 60000) {
+      weight = 0.1;
+    }
+    return weight;
+  }
+
+  function selectNextWeightedWord() {
+    let totalWeight = 0;
+    const entries = vocabulary.map(item => {
+      const w = getLeitnerPriority(item);
+      totalWeight += w;
+      return { item, weight: w };
+    });
+
+    let r = Math.random() * totalWeight;
+    for (const entry of entries) {
+      r -= entry.weight;
+      if (r <= 0) {
+        return entry.item;
+      }
+    }
+    return vocabulary[0];
+  }
+
   async function showNextWord() {
-    const item = vocabulary[state.reviewIdx];
+    const item = selectNextWeightedWord();
     visualEl.innerText = item.emoji || "💡";
     wordEl.innerText = item.word;
     
-    // If translation is not ready, fetch it
+    const key = item.word.toLowerCase().trim();
+    const stats = state.wordStats[key];
+    const score = stats ? (stats.score || 3) : 3;
+    starsEl.innerText = '⭐'.repeat(score) + '☆'.repeat(5 - score);
+
     if (!item.val) {
       transEl.innerText = "...";
       try {
@@ -1805,15 +2125,12 @@ function renderReviewView() {
       transEl.innerText = `"${item.val}"`;
     }
     
-    // Bounce scale animation
     visualEl.style.transform = 'scale(1.2)';
     setTimeout(() => { visualEl.style.transform = 'scale(1)'; }, 300);
     
     speak(item.word);
-    state.reviewIdx = (state.reviewIdx + 1) % vocabulary.length;
   }
 
-  // Initial call
   showNextWord();
   state.reviewTimer = setInterval(showNextWord, 4000);
 
