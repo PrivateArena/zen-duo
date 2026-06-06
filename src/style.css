@@ -1326,4 +1326,222 @@ button, input {
   }
 }
 
+/* ──────── ZEN MASCOT & WINDING MAP TRAIL ──────── */
+.path-map {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 64px; /* More vertical space for curve connections */
+  padding: 60px 0 100px;
+  position: relative;
+  max-width: 600px;
+  margin: 0 auto;
+  overflow: visible;
+}
+
+/* Hide old vertical line */
+.path-map::before {
+  display: none !important;
+}
+
+/* Alternating node placement for winding path */
+.path-map .map-node-container:nth-child(4n+1) {
+  transform: translateX(0);
+}
+.path-map .map-node-container:nth-child(4n+2) {
+  transform: translateX(-90px);
+}
+.path-map .map-node-container:nth-child(4n+3) {
+  transform: translateX(0);
+}
+.path-map .map-node-container:nth-child(4n+4) {
+  transform: translateX(90px);
+}
+
+.path-map-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  overflow: visible;
+}
+
+.path-map-svg path.completed {
+  fill: none;
+  stroke: var(--primary-color);
+  stroke-width: 14px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 2px 2px rgba(16, 185, 129, 0.3));
+}
+
+.path-map-svg path.locked {
+  fill: none;
+  stroke: hsl(220, 15%, 85%);
+  stroke-width: 12px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 10 10;
+}
+
+/* Mascot on map */
+.map-mascot-container {
+  position: absolute;
+  width: 120px;
+  height: 100px;
+  pointer-events: none;
+  z-index: 10;
+  transition: all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform: translate(65px, -30px); /* Position next to the level node */
+}
+
+/* Animations for mascot states */
+.anim-sleep-bob {
+  animation: sleepBob 4s ease-in-out infinite;
+}
+@keyframes sleepBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(8px) rotate(2deg); }
+}
+
+.anim-zzz text {
+  opacity: 0;
+  animation: zzzFloat 3s linear infinite;
+}
+.anim-zzz text:nth-child(1) { animation-delay: 0s; }
+.anim-zzz text:nth-child(2) { animation-delay: 1s; }
+.anim-zzz text:nth-child(3) { animation-delay: 2s; }
+@keyframes zzzFloat {
+  0% { transform: translate(0, 0) scale(0.8); opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 0.8; }
+  100% { transform: translate(15px, -35px) scale(1.2); opacity: 0; }
+}
+
+.anim-wing-clap-left {
+  animation: wingClapLeft 0.25s ease-in-out infinite alternate;
+}
+.anim-wing-clap-right {
+  animation: wingClapRight 0.25s ease-in-out infinite alternate;
+}
+@keyframes wingClapLeft {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(25deg); }
+}
+@keyframes wingClapRight {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(-25deg); }
+}
+
+.anim-foot-tap {
+  animation: footTap 0.3s ease-in-out infinite alternate;
+}
+@keyframes footTap {
+  0% { transform: rotate(0); }
+  100% { transform: rotate(-12deg); }
+}
+
+.anim-rain {
+  animation: rainFall 0.8s linear infinite;
+}
+@keyframes rainFall {
+  0% { transform: translateY(-8px); opacity: 0; }
+  30% { opacity: 0.8; }
+  90% { opacity: 0.8; }
+  100% { transform: translateY(16px); opacity: 0; }
+}
+
+.anim-spin-celebrate {
+  animation: spinDance 2s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+}
+@keyframes spinDance {
+  0% { transform: scale(1) rotate(0); }
+  15% { transform: scale(1.15) translateY(-12px) rotate(-15deg); }
+  30% { transform: scale(1.15) translateY(-12px) rotate(15deg); }
+  45% { transform: scale(1.15) translateY(-12px) rotate(-15deg); }
+  60% { transform: scale(1.15) translateY(-12px) rotate(15deg); }
+  75% { transform: scale(1) translateY(0) rotate(0); }
+  100% { transform: scale(1) rotate(360deg); }
+}
+
+/* Floating animation helper */
+.anim-float {
+  animation: floatEffect 3s ease-in-out infinite;
+}
+@keyframes floatEffect {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* Onboarding style overlays */
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.onboarding-card {
+  background: white;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 500px;
+  padding: 32px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  position: relative;
+  border: 4px solid var(--border-color);
+  animation: modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.onboarding-mascot {
+  width: 180px;
+  height: 150px;
+  margin: 0 auto 16px;
+}
+
+.onboarding-title {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 24px;
+  color: var(--text-main);
+  margin-bottom: 12px;
+}
+
+.onboarding-text {
+  font-size: 16px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 24px;
+  min-height: 80px;
+}
+
+.onboarding-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.onboarding-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border-color);
+  transition: all 0.3s ease;
+}
+
+.onboarding-dot.active {
+  background: var(--primary-color);
+  transform: scale(1.2);
+}
+
+
 

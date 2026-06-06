@@ -4,6 +4,7 @@ import { LEVELS } from './lessons.js';
 import { speak } from './tts.js';
 import { translate, generateSVG } from './translate.js';
 import { showModal } from './modal.js';
+import { getZenMascotSVG } from './zen-mascot.js';
 
 // --- State Management ---
 const state = {
@@ -23,7 +24,8 @@ const state = {
   isChecking: false, // true during check state before clicking "Continue"
   isCorrect: false,
   reviewTimer: null,
-  reviewIdx: 0
+  reviewIdx: 0,
+  incorrectInARow: 0
 };
 
 // --- Save State Helper ---
@@ -141,9 +143,158 @@ function renderView() {
 }
 
 // --- 1. Learn View (Interactive Milestones Map) ---
+// --- 1. Learn View (Interactive Winding Milestones Map) ---
+function drawPathTrail() {
+  const mapContainer = document.getElementById('path-map');
+  const svg = document.getElementById('path-map-svg');
+  const pathLocked = document.getElementById('path-locked');
+  const pathCompleted = document.getElementById('path-completed');
+  
+  if (!mapContainer || !svg) return;
+  
+  const mapRect = mapContainer.getBoundingClientRect();
+  svg.setAttribute('width', mapRect.width);
+  svg.setAttribute('height', mapRect.height);
+  svg.style.height = `${mapRect.height}px`;
+  
+  const nodes = mapContainer.querySelectorAll('.map-node');
+  if (nodes.length === 0) return;
+  
+  const coords = [];
+  nodes.forEach((node) => {
+    const rect = node.getBoundingClientRect();
+    const parentRect = mapContainer.getBoundingClientRect();
+    const x = rect.left - parentRect.left + rect.width / 2;
+    const y = rect.top - parentRect.top + rect.height / 2;
+    coords.push({ x, y, levelId: parseInt(node.dataset.levelId) });
+  });
+  
+  if (coords.length === 0) return;
+  
+  let completedPathD = "";
+  let lockedPathD = "";
+  
+  for (let i = 1; i < coords.length; i++) {
+    const prev = coords[i-1];
+    const curr = coords[i];
+    const midY = (prev.y + curr.y) / 2;
+    const segmentD = `M ${prev.x},${prev.y} C ${prev.x},${midY} ${curr.x},${midY} ${curr.x},${curr.y}`;
+    
+    const prevLevel = LEVELS.find(l => l.id === prev.levelId);
+    const prevCompleted = prevLevel ? prevLevel.lessons.every(l => state.completedLessons.includes(l.id)) : false;
+    
+    if (prevCompleted && curr.levelId <= state.unlockedLevelId) {
+      completedPathD += (completedPathD ? " " : "") + segmentD;
+    } else {
+      lockedPathD += (lockedPathD ? " " : "") + segmentD;
+    }
+  }
+  
+  pathCompleted.setAttribute('d', completedPathD);
+  pathLocked.setAttribute('d', lockedPathD);
+  
+  // Position Zen mascot
+  const activeNodeIdx = coords.findIndex(c => c.levelId === state.unlockedLevelId);
+  const targetNode = activeNodeIdx !== -1 ? coords[activeNodeIdx] : coords[0];
+  
+  const mascot = document.getElementById('map-mascot');
+  if (mascot && targetNode) {
+    const mascotX = targetNode.x - 60;
+    const mascotY = targetNode.y - 120;
+    mascot.style.left = `${mascotX}px`;
+    mascot.style.top = `${mascotY}px`;
+    mascot.innerHTML = getZenMascotSVG('happy', false);
+    mascot.style.pointerEvents = 'auto';
+    
+    mascot.onclick = (e) => {
+      e.stopPropagation();
+      playSound('correct');
+      mascot.innerHTML = getZenMascotSVG('excited', true);
+      setTimeout(() => {
+        if (state.activeView === 'learn') {
+          mascot.innerHTML = getZenMascotSVG('happy', false);
+        }
+      }, 1500);
+    };
+  }
+}
+
+function checkFirstRunOnboarding() {
+  if (localStorage.getItem('zd_onboarded')) return;
+  
+  const onboardingOverlay = document.createElement('div');
+  onboardingOverlay.className = 'onboarding-overlay';
+  onboardingOverlay.id = 'onboarding-overlay';
+  
+  const screens = [
+    {
+      title: "Meet Zen!",
+      text: "Xin chào! I'm Zen, your friendly learning guide. I'll be here to study, celebrate, and cheer you on!",
+      emotion: "happy",
+      audio: "Xin chào! I'm Zen, your friendly learning guide. I'll be here to study, celebrate, and cheer you on!"
+    },
+    {
+      title: "Learn & Play",
+      text: "We will play fun games to learn English and Vietnamese! Just tap the colorful path circles to start your journey.",
+      emotion: "excited",
+      audio: "We will play fun games to learn English and Vietnamese! Just tap the colorful path circles to start your journey."
+    },
+    {
+      title: "Express Feelings",
+      text: "Visit the Feelings garden to learn how I feel! Tap me to see me jump, laugh, or rest.",
+      emotion: "celebrating",
+      audio: "Visit the Feelings garden to learn how I feel! Tap me to see me jump, laugh, or rest."
+    }
+  ];
+  
+  let currentScreenIdx = 0;
+  
+  function renderScreen() {
+    const screen = screens[currentScreenIdx];
+    speak(screen.audio);
+    
+    onboardingOverlay.innerHTML = `
+      <div class="onboarding-card">
+        <div class="onboarding-mascot">
+          ${getZenMascotSVG(screen.emotion, true)}
+        </div>
+        <h2 class="onboarding-title">${screen.title}</h2>
+        <p class="onboarding-text">${screen.text}</p>
+        <div class="onboarding-dots">
+          ${screens.map((_, i) => `<span class="onboarding-dot ${i === currentScreenIdx ? 'active' : ''}"></span>`).join('')}
+        </div>
+        <button class="btn-3d btn-primary" id="onboarding-next">
+          ${currentScreenIdx === screens.length - 1 ? "Let's Go! 🚀" : "Next ➡️"}
+        </button>
+      </div>
+    `;
+    
+    document.getElementById('onboarding-next').onclick = () => {
+      playSound('click');
+      if (currentScreenIdx < screens.length - 1) {
+        currentScreenIdx++;
+        renderScreen();
+      } else {
+        localStorage.setItem('zd_onboarded', 'true');
+        onboardingOverlay.remove();
+        speak("Let's learn together!");
+      }
+    };
+  }
+  
+  document.body.appendChild(onboardingOverlay);
+  renderScreen();
+}
+
 function renderLearnView() {
   viewContainer.innerHTML = `
-    <div class="path-map" id="path-map"></div>
+    <div class="path-map" id="path-map">
+      <svg class="path-map-svg" id="path-map-svg">
+        <path class="locked" id="path-locked"></path>
+        <path class="completed" id="path-completed"></path>
+      </svg>
+      <div class="map-mascot-container" id="map-mascot"></div>
+    </div>
   `;
   
   const mapContainer = document.getElementById('path-map');
@@ -162,11 +313,11 @@ function renderLearnView() {
     const node = document.createElement('button');
     node.type = 'button';
     node.className = `map-node ${nodeClass}`;
+    node.dataset.levelId = level.id;
     node.innerHTML = `<span>${level.icon}</span>`;
     
     if (isUnlocked) {
       node.addEventListener('click', () => {
-        // Pick the first incomplete lesson, or restart the first if all are complete
         const nextLesson = level.lessons.find(l => !state.completedLessons.includes(l.id)) || level.lessons[0];
         startLesson(nextLesson);
       });
@@ -180,6 +331,35 @@ function renderLearnView() {
     nodeWrapper.appendChild(label);
     mapContainer.appendChild(nodeWrapper);
   });
+  
+  if (!window.hasPathMapResizeListener) {
+    window.addEventListener('resize', () => {
+      if (state.activeView === 'learn') {
+        drawPathTrail();
+      }
+    });
+    window.hasPathMapResizeListener = true;
+  }
+  
+  setTimeout(() => {
+    if (state.activeView === 'learn') {
+      drawPathTrail();
+    }
+  }, 100);
+  
+  if (!sessionStorage.getItem('zd_greeted')) {
+    sessionStorage.setItem('zd_greeted', 'true');
+    const hours = new Date().getHours();
+    let greetText = "Good morning! Let's learn together.";
+    if (hours >= 12 && hours < 18) {
+      greetText = "Good afternoon! Time for some learning.";
+    } else if (hours >= 18 || hours < 5) {
+      greetText = "Good evening! Let's do a quick lesson before bed.";
+    }
+    setTimeout(() => speak(greetText), 800);
+  }
+  
+  setTimeout(checkFirstRunOnboarding, 600);
 }
 
 // --- 2. Lesson Execution Flow ---
@@ -214,7 +394,10 @@ function renderLessonView() {
       <div class="progress-bar-container">
         <div class="progress-bar-fill" style="width: ${progressPercent}%"></div>
       </div>
-      <h2 class="question-title">${challenge.instruction}</h2>
+      <div class="lesson-header-row" style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+        <div class="lesson-mascot-inline" id="lesson-mascot-inline" style="width: 90px; height: 80px; flex-shrink: 0;"></div>
+        <h2 class="question-title" style="margin: 0; flex: 1; font-size: 22px;">${challenge.instruction}</h2>
+      </div>
       
       <div id="challenge-content-area"></div>
       
@@ -224,6 +407,11 @@ function renderLessonView() {
       </div>
     </div>
   `;
+  
+  const lessonMascot = document.getElementById('lesson-mascot-inline');
+  if (lessonMascot) {
+    lessonMascot.innerHTML = getZenMascotSVG('thinking', true);
+  }
   
   document.getElementById('lesson-exit-btn').addEventListener('click', async () => {
     const shouldExit = await showModal('exit-confirm');
@@ -560,11 +748,24 @@ function checkChallengeAnswer() {
   state.isChecking = true;
   state.isCorrect = isCorrect;
   
+  const lessonMascot = document.getElementById('lesson-mascot-inline');
+  
   if (isCorrect) {
+    state.incorrectInARow = 0;
+    if (lessonMascot) {
+      lessonMascot.innerHTML = getZenMascotSVG('excited', true);
+    }
     playSound('correct');
     submitBtn.innerText = 'Continue';
     submitBtn.className = 'btn-3d btn-primary';
   } else {
+    state.incorrectInARow++;
+    if (lessonMascot) {
+      lessonMascot.innerHTML = getZenMascotSVG('sad', true);
+    }
+    if (state.incorrectInARow >= 3) {
+      setTimeout(() => speak("Không sao đâu, hãy cố gắng lên nhé!"), 600);
+    }
     playSound('incorrect');
     state.hearts--;
     heartsVal.innerText = state.hearts;
@@ -573,6 +774,9 @@ function checkChallengeAnswer() {
     
     if (state.hearts <= 0) {
       setTimeout(async () => {
+        if (lessonMascot) {
+          lessonMascot.innerHTML = getZenMascotSVG('sleeping', true);
+        }
         await showModal('hearts-empty');
         switchView('learn');
       }, 800);
@@ -976,7 +1180,19 @@ const FEELINGS_DATA = {
     en: "Happy",
     vi: "Vui vẻ",
     emoji: "😊",
-    instruction: "Tap Zen to make him jump with joy!"
+    instruction: "Tap Zen to make him bounce happily!"
+  },
+  excited: {
+    en: "Excited",
+    vi: "Hào hứng",
+    emoji: "🤩",
+    instruction: "Tap Zen to watch him clap his wings in excitement!"
+  },
+  sleeping: {
+    en: "Sleeping",
+    vi: "Đang ngủ",
+    emoji: "😴",
+    instruction: "Shh... Tap Zen to see him snore gently."
   },
   sad: {
     en: "Sad",
@@ -984,17 +1200,17 @@ const FEELINGS_DATA = {
     emoji: "😢",
     instruction: "Tap Zen to watch him cry gentle tears."
   },
-  angry: {
-    en: "Angry",
-    vi: "Tức giận",
-    emoji: "😡",
-    instruction: "Tap Zen to see him huff and turn red!"
+  thinking: {
+    en: "Thinking",
+    vi: "Suy nghĩ",
+    emoji: "🤔",
+    instruction: "Tap Zen to watch him tap his foot in deep thought!"
   },
-  surprised: {
-    en: "Surprised",
-    vi: "Ngạc nhiên",
-    emoji: "😮",
-    instruction: "Tap the gift box to surprise Zen!"
+  celebrating: {
+    en: "Celebrating",
+    vi: "Chúc mừng",
+    emoji: "🎉",
+    instruction: "Tap Zen to see him celebrate with a party hat!"
   }
 };
 
@@ -1024,7 +1240,7 @@ function renderFeelingsView() {
           <h2 class="feelings-title-en" id="feelings-word-en">Happy</h2>
           <h3 class="feelings-title-vi" id="feelings-word-vi">Vui vẻ</h3>
         </div>
-        <p class="feelings-instruction-hint" id="feelings-hint">Tap Zen to make him jump with joy!</p>
+        <p class="feelings-instruction-hint" id="feelings-hint">Tap Zen to make him bounce happily!</p>
       </div>
     </div>
   `;
@@ -1064,36 +1280,38 @@ function renderFeelingsView() {
 
     // 3. Render the dynamic SVG scene
     const sceneArea = document.getElementById('feelings-scene-area');
-    sceneArea.innerHTML = getFeelingsSVG(currentFeelingState, interactiveState);
+    sceneArea.innerHTML = getZenMascotSVG(currentFeelingState, interactiveState);
 
     // 4. Hook up trigger interactions in the SVG
-    const svgTrigger = document.getElementById('svg-feeling-trigger');
-    if (svgTrigger) {
-      svgTrigger.addEventListener('click', () => {
+    const svgEl = sceneArea.querySelector('svg');
+    if (svgEl) {
+      svgEl.style.cursor = 'pointer';
+      svgEl.addEventListener('click', () => {
         interactiveState = !interactiveState;
         
         // Trigger sound effects and animations
-        if (currentFeelingState === 'happy') {
+        if (currentFeelingState === 'happy' || currentFeelingState === 'excited' || currentFeelingState === 'celebrating') {
           playSound('correct');
-          // Confetti celebration
-          confetti({
-            particleCount: 50,
-            spread: 60,
-            origin: { y: 0.55 }
-          });
+          if (currentFeelingState === 'celebrating' || currentFeelingState === 'happy') {
+            confetti({
+              particleCount: 50,
+              spread: 60,
+              origin: { y: 0.55 }
+            });
+          }
         } else if (currentFeelingState === 'sad') {
           playSound('incorrect');
-        } else if (currentFeelingState === 'angry') {
-          playSound('incorrect');
-        } else if (currentFeelingState === 'surprised') {
-          playSound('correct');
+        } else if (currentFeelingState === 'thinking') {
+          playSound('click');
+        } else if (currentFeelingState === 'sleeping') {
+          playSound('click');
         }
 
         // Re-render display with interactiveState active
         updateFeelingsDisplay();
 
-        // For happy and surprised, reset state after a short delay
-        if (currentFeelingState === 'happy' || currentFeelingState === 'surprised') {
+        // Reset state after a short delay for temporary animation states
+        if (['happy', 'excited', 'celebrating', 'thinking'].includes(currentFeelingState)) {
           setTimeout(() => {
             if (interactiveState) {
               interactiveState = false;
@@ -1109,152 +1327,6 @@ function renderFeelingsView() {
 
   // Initial draw
   updateFeelingsDisplay();
-}
-
-function getFeelingsSVG(emotion, active) {
-  let innerSVG = '';
-  
-  if (emotion === 'happy') {
-    const jumpClass = active ? 'anim-jump' : '';
-    innerSVG = `
-      <svg viewBox="0 0 200 160" width="100%" height="100%">
-        <circle cx="170" cy="30" r="15" fill="#fcd34d" />
-        <path d="M 20,130 A 80,80 0 0,1 180,130" fill="none" stroke="#f43f5e" stroke-width="6" opacity="0.6" />
-        <path d="M 28,130 A 72,72 0 0,1 172,130" fill="none" stroke="#fb923c" stroke-width="6" opacity="0.6" />
-        <path d="M 36,130 A 64,64 0 0,1 164,130" fill="none" stroke="#fbbf24" stroke-width="6" opacity="0.6" />
-        <path d="M 44,130 A 56,56 0 0,1 156,130" fill="none" stroke="#34d399" stroke-width="6" opacity="0.6" />
-        <ellipse cx="100" cy="138" rx="40" ry="6" fill="#e2e8f0" />
-        <g class="${jumpClass}" id="svg-feeling-trigger" style="cursor: pointer;">
-          <ellipse cx="100" cy="130" rx="30" ry="6" fill="#000000" opacity="0.1" />
-          <path d="M 100,48 Q 132,48 135,88 Q 138,126 100,126 Q 62,126 65,88 Q 68,48 100,48 Z" fill="#374151" />
-          <path d="M 100,58 Q 122,58 124,88 Q 126,120 100,120 Q 74,120 76,88 Q 78,58 100,58 Z" fill="#ffffff" />
-          <path d="M 78,124 Q 72,135 84,133 Q 90,131 88,124 Z" fill="#f59e0b" />
-          <path d="M 122,124 Q 128,135 116,133 Q 110,131 112,124 Z" fill="#f59e0b" />
-          ${active 
-            ? `<path d="M 64,88 Q 45,70 52,62 Q 60,60 68,80" fill="#374151" />
-               <path d="M 136,88 Q 155,70 148,62 Q 140,60 132,80" fill="#374151" />`
-            : `<path d="M 64,88 Q 48,102 54,106 Q 62,106 66,92" fill="#374151" />
-               <path d="M 136,88 Q 152,102 146,106 Q 138,106 134,92" fill="#374151" />`
-          }
-          <path d="M 82,72 Q 88,67 94,72" stroke="#1f2937" stroke-width="3" fill="none" stroke-linecap="round" />
-          <path d="M 106,72 Q 112,67 118,72" stroke="#1f2937" stroke-width="3" fill="none" stroke-linecap="round" />
-          <circle cx="76" cy="78" r="5" fill="#f472b6" opacity="0.6" />
-          <circle cx="124" cy="78" r="5" fill="#f472b6" opacity="0.6" />
-          <path d="M 94,76 L 106,76 L 100,86 Z" fill="#f59e0b" stroke="#d97706" stroke-width="1.5" />
-          <line x1="134" y1="88" x2="160" y2="60" stroke="#94a3b8" stroke-width="2" />
-          <ellipse cx="165" cy="50" rx="12" ry="16" fill="#f43f5e" />
-          <polygon points="161,64 169,64 165,58" fill="#e11d48" />
-        </g>
-      </svg>
-    `;
-  } else if (emotion === 'sad') {
-    innerSVG = `
-      <svg viewBox="0 0 200 160" width="100%" height="100%">
-        <path d="M 70,30 Q 60,15 80,10 Q 100,5 110,20 Q 125,10 135,22 Q 150,25 140,40 Q 145,50 130,50 L 70,50 Z" fill="#64748b" opacity="0.8" />
-        <line x1="80" y1="58" x2="78" y2="70" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" opacity="0.7" />
-        <line x1="110" y1="58" x2="108" y2="72" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" opacity="0.7" />
-        <line x1="130" y1="58" x2="128" y2="68" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" opacity="0.7" />
-        <g id="svg-feeling-trigger" style="cursor: pointer;">
-          <ellipse cx="100" cy="138" rx="30" ry="6" fill="#000000" opacity="0.1" />
-          <path d="M 100,58 Q 130,58 132,94 Q 134,128 100,128 Q 66,128 68,94 Q 70,58 100,58 Z" fill="#4b5563" />
-          <path d="M 100,68 Q 120,68 122,94 Q 124,122 100,122 Q 76,122 78,94 Q 80,68 100,68 Z" fill="#ffffff" />
-          <path d="M 80,126 Q 74,134 84,132 Q 90,130 88,126 Z" fill="#d97706" />
-          <path d="M 120,126 Q 126,134 116,132 Q 110,130 112,126 Z" fill="#d97706" />
-          <path d="M 68,94 Q 52,108 58,112 Q 66,112 70,98" fill="#4b5563" />
-          <path d="M 132,94 Q 148,108 142,112 Q 134,112 130,98" fill="#4b5563" />
-          <path d="M 80,82 Q 86,88 92,84" stroke="#1f2937" stroke-width="3" fill="none" stroke-linecap="round" />
-          <path d="M 108,84 Q 114,88 120,82" stroke="#1f2937" stroke-width="3" fill="none" stroke-linecap="round" />
-          <path d="M 94,88 Q 100,82 106,88 Q 100,94 94,88 Z" fill="#f59e0b" stroke="#d97706" stroke-width="1.5" />
-          ${active 
-            ? `<circle class="anim-tear-left" cx="84" cy="88" r="3" fill="#38bdf8" />
-               <circle class="anim-tear-right" cx="116" cy="88" r="3" fill="#38bdf8" />`
-            : ''
-          }
-        </g>
-      </svg>
-    `;
-  } else if (emotion === 'angry') {
-    const faceClass = active ? 'active' : '';
-    innerSVG = `
-      <svg viewBox="0 0 200 160" width="100%" height="100%">
-        <g stroke="#ef4444" stroke-width="2" opacity="${active ? '0.6' : '0.1'}">
-          <line x1="40" y1="40" x2="50" y2="50" />
-          <line x1="160" y1="40" x2="150" y2="50" />
-          <line x1="40" y1="120" x2="50" y2="110" />
-          <line x1="160" y1="120" x2="150" y2="110" />
-        </g>
-        ${active
-          ? `<g fill="#cbd5e1" opacity="0.8">
-               <path class="anim-steam-left" d="M 40,45 A 5,5 0 0 1 50,45 A 5,5 0 0 1 55,50 L 35,50 Z" />
-               <path class="anim-steam-right" d="M 150,45 A 5,5 0 0 1 160,45 A 5,5 0 0 1 165,50 L 145,50 Z" />
-             </g>`
-          : ''
-        }
-        <g id="svg-feeling-trigger" style="cursor: pointer;">
-          <ellipse cx="100" cy="138" rx="30" ry="6" fill="#000000" opacity="0.1" />
-          <path d="M 100,54 Q 130,54 133,90 Q 136,126 100,126 Q 64,126 67,90 Q 70,54 100,54 Z" fill="#374151" />
-          <path class="anim-angry-face ${faceClass}" d="M 100,64 Q 120,64 122,90 Q 124,120 100,120 Q 76,120 78,90 Q 80,64 100,64 Z" fill="#ffffff" />
-          <path d="M 80,124 Q 74,132 84,130 Q 90,128 88,124 Z" fill="#f59e0b" />
-          <path d="M 120,124 Q 126,132 116,130 Q 110,128 112,124 Z" fill="#f59e0b" />
-          <path d="M 68,90 Q 50,88 56,98 Q 66,104 70,94" fill="#374151" />
-          <path d="M 132,90 Q 150,88 144,98 Q 134,104 130,94" fill="#374151" />
-          <path d="M 80,72 L 94,78" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
-          <path d="M 120,72 L 106,78" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
-          <circle cx="86" cy="80" r="4" fill="#1f2937" />
-          <circle cx="114" cy="80" r="4" fill="#1f2937" />
-          <path d="M 94,84 L 106,84 L 100,90 Z" fill="#ea580c" />
-        </g>
-      </svg>
-    `;
-  } else if (emotion === 'surprised') {
-    const lidClass = active ? 'open' : '';
-    innerSVG = `
-      <svg viewBox="0 0 200 160" width="100%" height="100%">
-        ${active
-          ? `<g fill="#fcd34d">
-               <polygon class="anim-star-pop" points="160,50 163,56 170,56 165,60 167,66 160,62 153,66 155,60 150,56 157,56" style="--dx: 25px; --dy: -40px;" />
-               <polygon class="anim-star-pop" points="135,45 137,49 142,49 138,52 140,56 135,53 130,56 132,52 128,49 133,49" style="--dx: -10px; --dy: -50px;" />
-               <polygon class="anim-star-pop" points="165,80 167,83 171,83 168,86 169,90 165,88 161,90 162,86 159,83 163,83" style="--dx: 35px; --dy: -15px;" />
-             </g>`
-          : ''
-        }
-        <ellipse cx="70" cy="138" rx="25" ry="5" fill="#000000" opacity="0.1" />
-        <ellipse cx="145" cy="138" rx="20" ry="4" fill="#000000" opacity="0.1" />
-        <g>
-          <path d="M 70,62 Q 95,62 97,92 Q 99,122 70,122 Q 41,122 43,92 Q 45,62 70,62 Z" fill="#374151" />
-          <path d="M 70,70 Q 86,70 88,92 Q 90,116 70,116 Q 50,116 52,92 Q 54,70 70,70 Z" fill="#ffffff" />
-          <path d="M 54,120 Q 50,128 58,126 Q 62,125 60,120 Z" fill="#f59e0b" />
-          <path d="M 86,120 Q 90,128 82,126 Q 78,125 80,120 Z" fill="#f59e0b" />
-          <path d="M 43,92 Q 25,82 30,74 Q 38,74 45,86" fill="#374151" />
-          <path d="M 97,92 Q 115,82 110,74 Q 102,74 95,86" fill="#374151" />
-          ${active
-            ? `<circle cx="58" cy="80" r="7" fill="#1f2937" />
-               <circle cx="56" cy="78" r="3" fill="#ffffff" />
-               <circle cx="82" cy="80" r="7" fill="#1f2937" />
-               <circle cx="80" cy="78" r="3" fill="#ffffff" />`
-            : `<circle cx="58" cy="80" r="5" fill="#1f2937" />
-               <circle cx="57" cy="79" r="1.5" fill="#ffffff" />
-               <circle cx="82" cy="80" r="5" fill="#1f2937" />
-               <circle cx="81" cy="79" r="1.5" fill="#ffffff" />`
-          }
-          <circle cx="70" cy="88" r="${active ? '6' : '4'}" fill="#ea580c" stroke="#d97706" stroke-width="1.5" />
-          <circle cx="70" cy="88" r="${active ? '3' : '1.5'}" fill="#000000" />
-        </g>
-        <g id="svg-feeling-trigger" style="cursor: pointer;">
-          <rect x="125" y="100" width="40" height="30" fill="#ec4899" rx="3" />
-          <rect x="142" y="100" width="6" height="30" fill="#fcd34d" />
-          <rect x="125" y="112" width="40" height="6" fill="#fcd34d" />
-          <g class="box-lid-closed ${lidClass}">
-            <rect x="122" y="92" width="46" height="10" fill="#f43f5e" rx="2" />
-            <path d="M 138,92 Q 134,84 145,86 Q 145,92 145,92 Z" fill="#fcd34d" />
-            <path d="M 152,92 Q 156,84 145,86 Q 145,92 145,92 Z" fill="#fcd34d" />
-          </g>
-        </g>
-      </svg>
-    `;
-  }
-
-  return innerSVG;
 }
 
 // --- Initialize App ---
