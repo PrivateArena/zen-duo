@@ -5,6 +5,9 @@ import { speak } from './tts.js';
 import { translate, generateSVG } from './translate.js';
 import { showModal } from './modal.js';
 import { getZenMascotSVG } from './zen-mascot.js';
+import { registerSW } from 'virtual:pwa-register';
+
+registerSW({ immediate: true });
 
 // --- State Management ---
 const state = {
@@ -37,6 +40,17 @@ function saveState() {
 }
 
 // --- Audio Playback Helpers ---
+// Modular haptic feedback helper
+function triggerHaptic(pattern) {
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    try {
+      navigator.vibrate(pattern);
+    } catch (e) {
+      console.warn('Vibration feedback not supported or blocked:', e);
+    }
+  }
+}
+
 // Simple Web Audio API Synthesizers for UI feedback
 function playSound(type) {
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -69,6 +83,7 @@ function playSound(type) {
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
     osc.start();
     osc.stop(ctx.currentTime + 0.08);
+    triggerHaptic(15);
   }
 }
 
@@ -87,6 +102,14 @@ document.getElementById('nav-sandbox').addEventListener('click', () => switchVie
 document.getElementById('nav-review').addEventListener('click', () => switchView('review'));
 document.getElementById('nav-feelings').addEventListener('click', () => switchView('feelings'));
 mobileMenuToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+
+// Wire up bottom nav buttons
+document.querySelectorAll('.bottom-nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    const view = item.dataset.view;
+    switchView(view);
+  });
+});
 
 // --- Theme Toggling ---
 themeToggle.addEventListener('click', () => {
@@ -116,10 +139,28 @@ function switchView(view) {
   
   // Update menu active highlights
   document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-  if (view === 'learn') document.getElementById('nav-learn').classList.add('active');
-  if (view === 'sandbox') document.getElementById('nav-sandbox').classList.add('active');
-  if (view === 'review') document.getElementById('nav-review').classList.add('active');
-  if (view === 'feelings') document.getElementById('nav-feelings').classList.add('active');
+  document.querySelectorAll('.bottom-nav-item').forEach(item => item.classList.remove('active'));
+  
+  if (view === 'learn') {
+    document.getElementById('nav-learn').classList.add('active');
+    const bottomLearn = document.querySelector('.bottom-nav-item[data-view="learn"]');
+    if (bottomLearn) bottomLearn.classList.add('active');
+  }
+  if (view === 'sandbox') {
+    document.getElementById('nav-sandbox').classList.add('active');
+    const bottomSandbox = document.querySelector('.bottom-nav-item[data-view="sandbox"]');
+    if (bottomSandbox) bottomSandbox.classList.add('active');
+  }
+  if (view === 'review') {
+    document.getElementById('nav-review').classList.add('active');
+    const bottomReview = document.querySelector('.bottom-nav-item[data-view="review"]');
+    if (bottomReview) bottomReview.classList.add('active');
+  }
+  if (view === 'feelings') {
+    document.getElementById('nav-feelings').classList.add('active');
+    const bottomFeelings = document.querySelector('.bottom-nav-item[data-view="feelings"]');
+    if (bottomFeelings) bottomFeelings.classList.add('active');
+  }
   
   state.activeView = view;
   renderView();
@@ -647,18 +688,100 @@ function renderBuilderChallenge(challenge, container, submitBtn) {
     block.className = 'word-block';
     block.innerText = word;
     block.dataset.idx = idx;
+    block.style.touchAction = 'none'; // Prevent browser scrolling while dragging
     
-    block.addEventListener('click', () => {
-      if (state.isChecking) return;
-      playSound('click');
-      speak(word);
+    block.addEventListener('pointerdown', (e) => {
+      if (state.isChecking || block.classList.contains('used')) return;
+      block.setPointerCapture(e.pointerId);
       
-      if (!block.classList.contains('used')) {
-        block.classList.add('used');
-        addWordToSlot(word, idx, slot, pool);
-      }
+      const startX = e.clientX;
+      const startY = e.clientY;
+      let dragClone = null;
+      let hasDragged = false;
       
-      toggleSubmitBtn();
+      const onPointerMove = (moveEvent) => {
+        if (state.isChecking) return;
+        const dx = moveEvent.clientX - startX;
+        const dy = moveEvent.clientY - startY;
+        
+        if (!hasDragged && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+          hasDragged = true;
+          
+          dragClone = document.createElement('div');
+          dragClone.className = 'word-block dragging-ghost';
+          dragClone.innerText = word;
+          dragClone.style.position = 'fixed';
+          dragClone.style.zIndex = '9999';
+          dragClone.style.pointerEvents = 'none';
+          dragClone.style.opacity = '0.9';
+          dragClone.style.boxShadow = '0 8px 20px rgba(0,0,0,0.15)';
+          dragClone.style.transform = 'scale(1.05)';
+          dragClone.style.transition = 'none';
+          
+          const rect = block.getBoundingClientRect();
+          dragClone.style.width = `${rect.width}px`;
+          dragClone.style.height = `${rect.height}px`;
+          document.body.appendChild(dragClone);
+        }
+        
+        if (dragClone) {
+          const rect = block.getBoundingClientRect();
+          dragClone.style.left = `${moveEvent.clientX - rect.width / 2}px`;
+          dragClone.style.top = `${moveEvent.clientY - rect.height / 2}px`;
+          
+          const slotRect = slot.getBoundingClientRect();
+          const isOver = (
+            moveEvent.clientX >= slotRect.left &&
+            moveEvent.clientX <= slotRect.right &&
+            moveEvent.clientY >= slotRect.top &&
+            moveEvent.clientY <= slotRect.bottom
+          );
+          if (isOver) {
+            slot.classList.add('drag-over');
+          } else {
+            slot.classList.remove('drag-over');
+          }
+        }
+      };
+      
+      const onPointerUp = (upEvent) => {
+        block.releasePointerCapture(e.pointerId);
+        block.removeEventListener('pointermove', onPointerMove);
+        block.removeEventListener('pointerup', onPointerUp);
+        
+        if (dragClone) {
+          dragClone.remove();
+        }
+        slot.classList.remove('drag-over');
+        
+        if (state.isChecking) return;
+        
+        if (hasDragged) {
+          const slotRect = slot.getBoundingClientRect();
+          const isOver = (
+            upEvent.clientX >= slotRect.left &&
+            upEvent.clientX <= slotRect.right &&
+            upEvent.clientY >= slotRect.top &&
+            upEvent.clientY <= slotRect.bottom
+          );
+          if (isOver) {
+            playSound('click');
+            block.classList.add('used');
+            addWordToSlot(word, idx, slot, pool);
+            speak(word);
+            toggleSubmitBtn();
+          }
+        } else {
+          playSound('click');
+          speak(word);
+          block.classList.add('used');
+          addWordToSlot(word, idx, slot, pool);
+          toggleSubmitBtn();
+        }
+      };
+      
+      block.addEventListener('pointermove', onPointerMove);
+      block.addEventListener('pointerup', onPointerUp);
     });
     
     pool.appendChild(block);
@@ -669,16 +792,90 @@ function renderBuilderChallenge(challenge, container, submitBtn) {
     placed.type = 'button';
     placed.className = 'word-block';
     placed.innerText = word;
+    placed.style.touchAction = 'none';
     
-    placed.addEventListener('click', () => {
+    placed.addEventListener('pointerdown', (e) => {
       if (state.isChecking) return;
-      playSound('click');
-      placed.remove();
-      const originalBlock = poolEl.querySelector(`[data-idx="${originalIdx}"]`);
-      if (originalBlock) originalBlock.classList.remove('used');
+      placed.setPointerCapture(e.pointerId);
       
-      state.sentenceBuilderAnswers = state.sentenceBuilderAnswers.filter(item => item.idx !== originalIdx);
-      toggleSubmitBtn();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      let dragClone = null;
+      let hasDragged = false;
+      
+      const onPointerMove = (moveEvent) => {
+        if (state.isChecking) return;
+        const dx = moveEvent.clientX - startX;
+        const dy = moveEvent.clientY - startY;
+        
+        if (!hasDragged && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+          hasDragged = true;
+          
+          dragClone = document.createElement('div');
+          dragClone.className = 'word-block dragging-ghost';
+          dragClone.innerText = word;
+          dragClone.style.position = 'fixed';
+          dragClone.style.zIndex = '9999';
+          dragClone.style.pointerEvents = 'none';
+          dragClone.style.opacity = '0.9';
+          dragClone.style.boxShadow = '0 8px 20px rgba(0,0,0,0.15)';
+          dragClone.style.transform = 'scale(1.05)';
+          dragClone.style.transition = 'none';
+          
+          const rect = placed.getBoundingClientRect();
+          dragClone.style.width = `${rect.width}px`;
+          dragClone.style.height = `${rect.height}px`;
+          document.body.appendChild(dragClone);
+        }
+        
+        if (dragClone) {
+          const rect = placed.getBoundingClientRect();
+          dragClone.style.left = `${moveEvent.clientX - rect.width / 2}px`;
+          dragClone.style.top = `${moveEvent.clientY - rect.height / 2}px`;
+        }
+      };
+      
+      const onPointerUp = (upEvent) => {
+        placed.releasePointerCapture(e.pointerId);
+        placed.removeEventListener('pointermove', onPointerMove);
+        placed.removeEventListener('pointerup', onPointerUp);
+        
+        if (dragClone) {
+          dragClone.remove();
+        }
+        
+        if (state.isChecking) return;
+        
+        if (hasDragged) {
+          const slotRect = slotEl.getBoundingClientRect();
+          const isOutsideSlot = (
+            upEvent.clientX < slotRect.left ||
+            upEvent.clientX > slotRect.right ||
+            upEvent.clientY < slotRect.top ||
+            upEvent.clientY > slotRect.bottom
+          );
+          if (isOutsideSlot) {
+            playSound('click');
+            placed.remove();
+            const originalBlock = poolEl.querySelector(`[data-idx="${originalIdx}"]`);
+            if (originalBlock) originalBlock.classList.remove('used');
+            
+            state.sentenceBuilderAnswers = state.sentenceBuilderAnswers.filter(item => item.idx !== originalIdx);
+            toggleSubmitBtn();
+          }
+        } else {
+          playSound('click');
+          placed.remove();
+          const originalBlock = poolEl.querySelector(`[data-idx="${originalIdx}"]`);
+          if (originalBlock) originalBlock.classList.remove('used');
+          
+          state.sentenceBuilderAnswers = state.sentenceBuilderAnswers.filter(item => item.idx !== originalIdx);
+          toggleSubmitBtn();
+        }
+      };
+      
+      placed.addEventListener('pointermove', onPointerMove);
+      placed.addEventListener('pointerup', onPointerUp);
     });
     
     slotEl.appendChild(placed);
@@ -756,6 +953,7 @@ function checkChallengeAnswer() {
       lessonMascot.innerHTML = getZenMascotSVG('excited', true);
     }
     playSound('correct');
+    triggerHaptic([80, 50, 80]); // double pulse
     submitBtn.innerText = 'Continue';
     submitBtn.className = 'btn-3d btn-primary';
   } else {
@@ -767,6 +965,7 @@ function checkChallengeAnswer() {
       setTimeout(() => speak("Không sao đâu, hãy cố gắng lên nhé!"), 600);
     }
     playSound('incorrect');
+    triggerHaptic(250); // long buzz
     state.hearts--;
     heartsVal.innerText = state.hearts;
     submitBtn.innerText = 'Continue';
@@ -794,6 +993,7 @@ function nextChallenge() {
   } else {
     // Lesson Complete!
     playSound('correct');
+    triggerHaptic([100, 50, 100, 50, 200]); // triple pulse
     
     // Confetti celebration!
     confetti({

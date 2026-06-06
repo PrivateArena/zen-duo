@@ -147,12 +147,13 @@ button, input {
 
 .nav-item button {
   width: 100%;
-  padding: 14px 16px;
+  min-height: 56px;
+  padding: 16px 20px;
   background: transparent;
   border: none;
   border-radius: var(--radius-md);
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-light);
   display: flex;
   align-items: center;
@@ -230,6 +231,7 @@ button, input {
 /* Playful 3D tactile buttons */
 .btn-3d {
   position: relative;
+  min-height: 56px;
   padding: 14px 28px;
   border-radius: var(--radius-md);
   font-size: 18px;
@@ -245,6 +247,7 @@ button, input {
   align-items: center;
   justify-content: center;
   gap: 10px;
+  box-sizing: border-box;
 }
 
 .btn-3d:active {
@@ -541,6 +544,15 @@ button, input {
   padding: 8px;
   justify-content: center;
   align-items: center;
+  transition: all 0.2s ease;
+  border-radius: var(--radius-sm);
+}
+
+.build-slot.drag-over {
+  border-bottom-style: solid;
+  border-color: var(--primary-color);
+  background-color: rgba(16, 185, 129, 0.08);
+  transform: scale(1.02);
 }
 
 .word-pool {
@@ -555,16 +567,22 @@ button, input {
 }
 
 .word-block {
-  padding: 10px 16px;
+  min-height: 56px;
+  min-width: 56px;
+  padding: 12px 20px;
   border-radius: 12px;
   border: 2px solid var(--border-color);
   background: var(--card-bg);
   box-shadow: 0 4px 0 var(--border-color);
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   cursor: pointer;
   user-select: none;
   transition: all 0.1s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .word-block:hover {
@@ -1541,6 +1559,98 @@ button, input {
 .onboarding-dot.active {
   background: var(--primary-color);
   transform: scale(1.2);
+}
+
+/* ==========================================================================
+   Phase 2 PWA + Touch Perfection Bottom Nav
+   ========================================================================== */
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 76px;
+  background: var(--bg-card);
+  border-top: 3px solid var(--border-color);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+  z-index: 1000;
+  padding: 0 12px;
+  box-sizing: border-box;
+}
+
+.bottom-nav-menu {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bottom-nav-item {
+  flex: 1;
+  text-align: center;
+}
+
+.bottom-nav-item button {
+  background: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px 0;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12px;
+  gap: 4px;
+}
+
+.bottom-nav-item button:active {
+  transform: scale(0.92);
+}
+
+.bottom-nav-item.active button {
+  color: var(--primary-color);
+}
+
+.bottom-nav-icon {
+  font-size: 24px;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.bottom-nav-item.active .bottom-nav-icon {
+  transform: translateY(-4px) scale(1.2);
+}
+
+.bottom-nav-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+/* Override responsive menu toggling and set main content padding */
+@media (max-width: 768px) {
+  .sidebar {
+    display: none !important;
+  }
+  .menu-toggle {
+    display: none !important;
+  }
+  .bottom-nav {
+    display: block;
+  }
+  .main-content {
+    margin-left: 0 !important;
+    padding-bottom: 96px !important;
+  }
 }
 
 
