@@ -41,6 +41,12 @@ export const LEVELS = [
             promptText: "Con mèo chạy",
             targetText: "The cat runs",
             blocks: ["cat", "The", "runs", "dog", "flies"]
+          },
+          {
+            type: "speaking",
+            instruction: "Say 'Dog' into the mic!",
+            word: "Dog",
+            emoji: "🐶"
           }
         ]
       },
@@ -119,6 +125,12 @@ export const LEVELS = [
             promptText: "Tôi uống nước",
             targetText: "I drink water",
             blocks: ["I", "water", "drink", "eat", "apple"]
+          },
+          {
+            type: "speaking",
+            instruction: "Say 'Apple' into the mic!",
+            word: "Apple",
+            emoji: "🍎"
           }
         ]
       },

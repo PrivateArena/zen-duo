@@ -62,6 +62,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/tts/, '')
       },
+      '/api/stt': {
+        target: 'http://localhost:5056',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/stt/, '/stt')
+      },
       '/api/translate': {
         target: 'http://localhost:8765',
         changeOrigin: true,

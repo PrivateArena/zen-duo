@@ -591,6 +591,8 @@ function resetChallengeState() {
   state.yesNoSelection = null;
   state.dragSortAnswers = {};
   state.fillBlankSelection = null;
+  state.speakingCorrect = false;
+  state.speakingHeard = '';
   state.isChecking = false;
   state.isCorrect = false;
 }
@@ -658,6 +660,8 @@ function renderLessonView() {
     renderDragSortChallenge(challenge, contentArea, submitBtn);
   } else if (challenge.type === 'fill-blank') {
     renderFillBlankChallenge(challenge, contentArea, submitBtn);
+  } else if (challenge.type === 'speaking') {
+    renderSpeakingChallenge(challenge, contentArea, submitBtn);
   }
 
   // Speak challenge instruction with a small delay for child guidance
@@ -1498,6 +1502,191 @@ function renderFillBlankChallenge(challenge, container, submitBtn) {
   container.appendChild(wrapper);
 }
 
+// Speaking challenge renderer
+function renderSpeakingChallenge(challenge, container, submitBtn) {
+  submitBtn.innerText = 'Skip';
+  submitBtn.className = 'btn-3d btn-secondary';
+  submitBtn.removeAttribute('disabled');
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'speaking-container';
+
+  // 1. Emoji Visual Card
+  const visualCard = document.createElement('div');
+  visualCard.className = 'speaking-visual-card';
+  visualCard.innerText = challenge.emoji || '🗣️';
+  visualCard.addEventListener('click', () => {
+    playSound('click');
+    speak(challenge.word);
+  });
+
+  // 2. Word with Speaker Icon
+  const wordContainer = document.createElement('div');
+  wordContainer.className = 'speaking-word-container';
+  wordContainer.innerHTML = `
+    <span>${challenge.word}</span>
+    <svg viewBox="0 0 24 24">
+      <path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77zm-3 .77L6.5 8H3v8h3.5l4.5 4V4zm6 8c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+    </svg>
+  `;
+  wordContainer.addEventListener('click', () => {
+    playSound('click');
+    speak(challenge.word);
+  });
+
+  // Speak the word initially with small delay so kid hears it
+  setTimeout(() => speak(challenge.word), 400);
+
+  // 3. Mic button container
+  const micBtnContainer = document.createElement('div');
+  micBtnContainer.className = 'mic-btn-container';
+
+  const micBtn = document.createElement('button');
+  micBtn.type = 'button';
+  micBtn.className = 'mic-btn';
+  micBtn.innerHTML = '🎙️';
+
+  // 4. Feedback label
+  const feedback = document.createElement('div');
+  feedback.className = 'speaking-feedback';
+  feedback.innerText = 'Tap to Speak';
+
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let isRecording = false;
+  let autoStopTimeout = null;
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        audioChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        // Stop all tracks to release mic
+        stream.getTracks().forEach(track => track.stop());
+
+        feedback.className = 'speaking-feedback';
+        feedback.innerText = 'Zen is thinking... 🧐';
+        
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'speaking.webm');
+
+        try {
+          const response = await fetch('/api/stt?lang=en', {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!response.ok) throw new Error('Transcription error');
+
+          const data = await response.json();
+          const heardText = (data.text || '').trim();
+          
+          if (heardText) {
+            const isMatch = checkSpeakingMatch(heardText, challenge.word);
+            state.speakingHeard = heardText;
+            state.speakingCorrect = isMatch;
+
+            if (isMatch) {
+              feedback.className = 'speaking-feedback success';
+              feedback.innerText = `Perfect! You said: "${challenge.word}"`;
+              micBtn.innerHTML = '✅';
+              micBtn.style.backgroundColor = 'var(--primary-color)';
+              
+              // Mascot celebrates!
+              const inlineMascot = document.getElementById('lesson-mascot-inline');
+              if (inlineMascot) {
+                inlineMascot.innerHTML = getZenMascotSVG('excited', true);
+              }
+
+              playSound('correct');
+              submitBtn.innerText = 'Continue';
+              submitBtn.className = 'btn-3d btn-primary';
+              state.isCorrect = true;
+              state.isChecking = true;
+            } else {
+              feedback.className = 'speaking-feedback error';
+              feedback.innerText = `Heard: "${heardText}" (Try again!)`;
+              micBtn.innerHTML = '🎙️';
+              submitBtn.innerText = 'Check';
+              submitBtn.className = 'btn-3d btn-primary';
+            }
+          } else {
+            feedback.className = 'speaking-feedback error';
+            feedback.innerText = 'No speech heard! Try again 🎙️';
+            micBtn.innerHTML = '🎙️';
+          }
+        } catch (err) {
+          console.error(err);
+          feedback.className = 'speaking-feedback error';
+          feedback.innerText = 'Failed to recognize. Check your microphone!';
+          micBtn.innerHTML = '🎙️';
+        }
+      };
+
+      mediaRecorder.start();
+      isRecording = true;
+      micBtn.className = 'mic-btn recording';
+      micBtn.innerHTML = '🛑';
+      feedback.innerText = 'Listening... Speak now!';
+      triggerHaptic(100);
+
+      // Auto stop after 4 seconds
+      autoStopTimeout = setTimeout(() => {
+        if (isRecording) {
+          stopRecording();
+        }
+      }, 4000);
+
+    } catch (err) {
+      console.error(err);
+      feedback.className = 'speaking-feedback error';
+      feedback.innerText = 'Microphone permission denied!';
+    }
+  }
+
+  function stopRecording() {
+    if (autoStopTimeout) {
+      clearTimeout(autoStopTimeout);
+      autoStopTimeout = null;
+    }
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    }
+    isRecording = false;
+    micBtn.className = 'mic-btn';
+    triggerHaptic(50);
+  }
+
+  micBtn.addEventListener('click', () => {
+    playSound('click');
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  });
+
+  micBtnContainer.appendChild(micBtn);
+  wrapper.appendChild(visualCard);
+  wrapper.appendChild(wordContainer);
+  wrapper.appendChild(micBtnContainer);
+  wrapper.appendChild(feedback);
+  container.appendChild(wrapper);
+}
+
+function checkSpeakingMatch(heard, target) {
+  const h = heard.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"").trim();
+  const t = target.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"").trim();
+  return h.includes(t) || t.includes(h);
+}
+
 // Verify answer
 function checkChallengeAnswer() {
   const challenge = state.currentLesson.challenges[state.currentChallengeIdx];
@@ -1592,9 +1781,10 @@ function checkChallengeAnswer() {
         helper.style.fontWeight = 'bold';
         helper.style.marginTop = '8px';
         helper.innerText = `Correct: "${challenge.answer}"`;
-        document.querySelector('.fill-blank-challenge').appendChild(helper);
       }
     }
+  } else if (challenge.type === 'speaking') {
+    isCorrect = !!state.speakingCorrect;
   }
   
   // Smart Learning Engine: Track word performance based on challenge type
@@ -1617,6 +1807,8 @@ function checkChallengeAnswer() {
     });
   } else if (challenge.type === 'fill-blank') {
     trackWordPerformance(challenge.answer, '💡', isCorrect);
+  } else if (challenge.type === 'speaking') {
+    trackWordPerformance(challenge.word, challenge.emoji || '🗣️', isCorrect);
   }
 
   state.rollingResults.push(isCorrect);
@@ -2007,6 +2199,12 @@ async function initDynamicVocabulary() {
               list.push({ word: cleanWord, emoji: '💡', val: '' });
             }
           });
+        } else if (challenge.type === 'speaking') {
+          const cleanWord = challenge.word.trim();
+          if (!seen.has(cleanWord.toLowerCase())) {
+            seen.add(cleanWord.toLowerCase());
+            list.push({ word: cleanWord, emoji: challenge.emoji || '🗣️', val: '' });
+          }
         }
       });
     });
