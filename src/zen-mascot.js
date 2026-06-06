@@ -1,11 +1,53 @@
 /**
  * Zen Mascot SVG Template Generator
- * Provides 6 emotional states for Zen the Penguin mascot.
+ * Provides 6 emotional states for Zen the Penguin mascot, with accessories support.
  * States: happy, excited, sleeping, sad, thinking, celebrating
  */
+
+function getOutfitSVG(outfit) {
+  if (!outfit || outfit === 'default') return '';
+  if (outfit === 'astronaut') {
+    return `
+      <!-- Astronaut Helmet -->
+      <g style="transform: translate(0, 0); pointer-events: none;">
+        <circle cx="100" cy="76" r="54" fill="rgba(147, 197, 253, 0.25)" stroke="#60a5fa" stroke-width="3.5" />
+        <circle cx="75" cy="50" r="12" fill="#ffffff" opacity="0.2" />
+        <rect x="75" y="120" width="50" height="8" rx="2.5" fill="#64748B" stroke="#475569" stroke-width="1.5" />
+      </g>
+    `;
+  }
+  if (outfit === 'chef') {
+    return `
+      <!-- Chef Hat -->
+      <g style="transform: translate(0, 0); pointer-events: none;">
+        <path d="M 75,38 Q 62,18 100,12 Q 138,18 125,38 Z" fill="#ffffff" stroke="#94a3b8" stroke-width="2" />
+        <rect x="80" y="30" width="40" height="12" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="2" />
+        <line x1="90" y1="28" x2="90" y2="36" stroke="#cbd5e1" stroke-width="1.5" />
+        <line x1="100" y1="28" x2="100" y2="36" stroke="#cbd5e1" stroke-width="1.5" />
+        <line x1="110" y1="28" x2="110" y2="36" stroke="#cbd5e1" stroke-width="1.5" />
+      </g>
+    `;
+  }
+  if (outfit === 'knight') {
+    return `
+      <!-- Knight Helmet -->
+      <g style="transform: translate(0, 0); pointer-events: none;">
+        <path d="M 76,40 Q 72,15 100,12 Q 128,15 124,40 Z" fill="#94a3b8" stroke="#475569" stroke-width="2" />
+        <!-- Red plum feather -->
+        <path d="M 100,12 Q 130,-10 140,5" stroke="#ef4444" stroke-width="4.5" stroke-linecap="round" fill="none" />
+        <!-- Visor ridge -->
+        <path d="M 82,34 L 118,34" stroke="#475569" stroke-width="3" stroke-linecap="round" />
+      </g>
+    `;
+  }
+  return '';
+}
+
 export function getZenMascotSVG(emotion = 'happy', active = false) {
   let innerSVG = '';
   const emo = emotion.toLowerCase();
+  const outfit = localStorage.getItem('zd_active_outfit') || 'default';
+  const outfitSVG = getOutfitSVG(outfit);
   
   if (emo === 'happy') {
     const jumpClass = active ? 'anim-jump' : '';
@@ -42,6 +84,7 @@ export function getZenMascotSVG(emotion = 'happy', active = false) {
               <path d="M 160,40 C 160,30 145,30 145,45 C 145,60 160,70 160,70 C 160,70 175,60 175,45 C 175,30 160,30 160,40 Z" fill="#f43f5e" transform="scale(0.5) translate(160, -20)" />
             </g>
           ` : ''}
+          ${outfitSVG}
         </g>
       </svg>
     `;
@@ -78,6 +121,7 @@ export function getZenMascotSVG(emotion = 'happy', active = false) {
               <polygon points="150,35 153,41 160,41 155,45 157,51 150,47 143,51 145,45 140,41 147,41" class="anim-star-pop" style="--dx:20px; --dy:-20px;" />
             </g>
           ` : ''}
+          ${outfitSVG}
         </g>
       </svg>
     `;
@@ -111,6 +155,7 @@ export function getZenMascotSVG(emotion = 'happy', active = false) {
               <text x="168" y="22" font-size="22">Z</text>
             </g>
           ` : ''}
+          ${outfitSVG}
         </g>
       </svg>
     `;
@@ -144,6 +189,7 @@ export function getZenMascotSVG(emotion = 'happy', active = false) {
             <circle class="anim-tear-left" cx="84" cy="80" r="3.5" fill="#38bdf8" />
             <circle class="anim-tear-right" cx="116" cy="80" r="3.5" fill="#38bdf8" />
           ` : ''}
+          ${outfitSVG}
         </g>
       </svg>
     `;
@@ -179,6 +225,7 @@ export function getZenMascotSVG(emotion = 'happy', active = false) {
               <text x="144" y="45" font-family="'Fredoka', sans-serif" font-weight="bold" font-size="16" fill="#475569">?</text>
             </g>
           ` : ''}
+          ${outfitSVG}
         </g>
       </svg>
     `;
@@ -224,6 +271,7 @@ export function getZenMascotSVG(emotion = 'happy', active = false) {
               <circle cx="160" cy="80" r="2" fill="#06b6d4" />
             </g>
           ` : ''}
+          ${outfitSVG}
         </g>
       </svg>
     `;

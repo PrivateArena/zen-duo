@@ -22,7 +22,7 @@ export function showModal(type, data = {}) {
 
   return new Promise((resolve) => {
     if (type === 'lesson-complete') {
-      const { xp = 10, hearts = 5 } = data;
+      const { xp = 10, gems = 0, hearts = 5 } = data;
       // Stars earned: 5 hearts -> 3 stars; 3-4 hearts -> 2 stars; 1-2 hearts -> 1 star
       const starsCount = hearts === 5 ? 3 : (hearts >= 3 ? 2 : 1);
       const starEmojis = '⭐'.repeat(starsCount) + '☆'.repeat(3 - starsCount);
@@ -35,9 +35,17 @@ export function showModal(type, data = {}) {
           <h1 class="modal-title animate-rainbow">Awesome Job!</h1>
           <div class="stars-display">${starEmojis}</div>
           <p class="modal-body-text">You completed the lesson with <strong>${hearts}</strong> hearts remaining!</p>
-          <div class="xp-gain-badge">
-            <span class="xp-icon">⭐</span>
-            <span class="xp-text">+${xp} XP</span>
+          <div class="rewards-gain-container" style="display: flex; gap: 16px; justify-content: center; margin: 15px 0;">
+            <div class="xp-gain-badge">
+              <span class="xp-icon">⭐</span>
+              <span class="xp-text">+${xp} XP</span>
+            </div>
+            ${gems > 0 ? `
+            <div class="gems-gain-badge" style="background: rgba(59, 130, 246, 0.1); color: #2563EB; font-weight: 800; font-size: 16px; padding: 10px 16px; border-radius: 16px; display: flex; align-items: center; gap: 6px; border: 2px solid rgba(59, 130, 246, 0.2);">
+              <span class="gems-icon">💎</span>
+              <span class="gems-text">+${gems} Gems</span>
+            </div>
+            ` : ''}
           </div>
           <button type="button" class="btn-3d btn-primary btn-large" id="modal-action-btn">Continue</button>
         </div>
