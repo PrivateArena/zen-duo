@@ -724,3 +724,110 @@ export const LEVELS = [
     ]
   }
 ];
+
+export const READING_LETTERS = [
+  { char: "A", sound: "ah", emoji: "🍎", example: "Apple" },
+  { char: "B", sound: "buh", emoji: "🐝", example: "Bee" },
+  { char: "C", sound: "cuh", emoji: "🐱", example: "Cat" },
+  { char: "D", sound: "duh", emoji: "🐶", example: "Dog" },
+  { char: "E", sound: "eh", emoji: "🐘", example: "Elephant" },
+  { char: "F", sound: "fuh", emoji: "🐟", example: "Fish" },
+  { char: "G", sound: "guh", emoji: "🐐", example: "Goat" },
+  { char: "H", sound: "huh", emoji: "🏠", example: "House" },
+  { char: "I", sound: "ih", emoji: "🦎", example: "Iguana" },
+  { char: "J", sound: "juh", emoji: "🏺", example: "Jar" },
+  { char: "K", sound: "kuh", emoji: "🪁", example: "Kite" },
+  { char: "L", sound: "luh", emoji: "🦁", example: "Lion" },
+  { char: "M", sound: "muh", emoji: "🐒", example: "Monkey" },
+  { char: "N", sound: "nuh", emoji: "巢", example: "Nest" },
+  { char: "O", sound: "oh", emoji: "🐙", example: "Octopus" },
+  { char: "P", sound: "puh", emoji: "🐧", example: "Penguin" },
+  { char: "Q", sound: "kwuh", emoji: "👑", example: "Queen" },
+  { char: "R", sound: "ruh", emoji: "🐰", example: "Rabbit" },
+  { char: "S", sound: "suh", emoji: "☀️", example: "Sun" },
+  { char: "T", sound: "tuh", emoji: "🐯", example: "Tiger" },
+  { char: "U", sound: "uh", emoji: "⛱️", example: "Umbrella" },
+  { char: "V", sound: "vuh", emoji: "🎻", example: "Violin" },
+  { char: "W", sound: "wuh", emoji: "💧", example: "Water" },
+  { char: "X", sound: "ks", emoji: "🪕", example: "Xylophone" },
+  { char: "Y", sound: "yuh", emoji: "🧶", example: "Yarn" },
+  { char: "Z", sound: "zuh", emoji: "🦓", example: "Zebra" }
+];
+
+export const READING_SIGHT_WORDS = [
+  { word: "The", translation: "Cái/Con/Thì", example: "The cat is happy" },
+  { word: "A", translation: "Một", example: "A red apple" },
+  { word: "Is", translation: "Thì/Là", example: "The dog is sleeping" },
+  { word: "I", translation: "Tôi/Tớ/Con", example: "I see a bird" },
+  { word: "You", translation: "Bạn/Cậu/Con", example: "You trace the letter" },
+  { word: "And", translation: "Và", example: "A fish and a frog" },
+  { word: "In", translation: "Trong", example: "A dog in the house" },
+  { word: "It", translation: "Nó", example: "It is a happy penguin" },
+  { word: "To", translation: "Đến/Về", example: "Go to the tree" },
+  { word: "On", translation: "Trên", example: "A cat on the chair" }
+];
+
+export const READING_STORIES = [
+  {
+    id: "story_1",
+    title: "The Sad Penguin",
+    icon: "🐧",
+    pages: [
+      {
+        text: "The penguin is sad.",
+        translation: "Chú chim cánh cụt đang buồn.",
+        emoji: "🐧",
+        svgState: "sad"
+      },
+      {
+        text: "The penguin sees a fish.",
+        translation: "Chú chim cánh cụt nhìn thấy một con cá.",
+        emoji: "🐟",
+        svgState: "excited"
+      },
+      {
+        text: "The penguin swims.",
+        translation: "Chú chim cánh cụt bơi.",
+        emoji: "🏊",
+        svgState: "excited"
+      },
+      {
+        text: "The penguin is happy now!",
+        translation: "Bây giờ chú chim cánh cụt đã vui vẻ!",
+        emoji: "✨",
+        svgState: "excited"
+      }
+    ]
+  },
+  {
+    id: "story_2",
+    title: "The Big Red Apple",
+    icon: "🍎",
+    pages: [
+      {
+        text: "I see a tree.",
+        translation: "Tớ thấy một cái cây.",
+        emoji: "🌳",
+        svgState: "excited"
+      },
+      {
+        text: "A red apple falls.",
+        translation: "Một quả táo đỏ rơi xuống.",
+        emoji: "🍎",
+        svgState: "sleeping"
+      },
+      {
+        text: "The dog eats the apple.",
+        translation: "Chú chó ăn quả táo.",
+        emoji: "🐶",
+        svgState: "excited"
+      },
+      {
+        text: "The apple is yummy!",
+        translation: "Quả táo thật ngon lành!",
+        emoji: "😋",
+        svgState: "excited"
+      }
+    ]
+  }
+];
