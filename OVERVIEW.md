@@ -28,16 +28,24 @@ graph TD
 ```
 
 ### 1. Frontend SPA Layer
-- **`main.js`**: Core game controller managing state (XP, hearts, streaks) and switching between four views:
-  - **Learn Map**: Game-map path containing levels.
-  - **Lesson Mode**: The standard challenge sequence (matching pairs, choices, listening tasks, sentence building).
-  - **Curiosity Sandbox**: Real-time illustration and pronunciation playground.
-  - **Auto Review**: Hands-free background slideshow mode.
-- **`style.css`**: Design tokens utilizing custom playful fonts (`Fredoka`), satisfying 3D button animations, and dark/light color variations.
+- **`main.js`**: Core game controller managing state (XP, hearts, streaks, child profiles, custom coloring gallery) and switching between interactive views:
+  - **Learn Map**: Interactive winding path containing 20+ thematic levels with category filters.
+  - **Lesson Mode**: Interactive game modes (matching pairs, multiple choices, listening, yes-no, drag-sort, speaking/STT validation).
+  - **Curiosity Sandbox**: Vocabulary canvas rendering inline SVGs with manual path coloring palettes and gallery exporters.
+  - **Auto Review**: Hands-free background slideshow mode for vocabulary assimilation.
+  - **Reading Foundation**: Trace-based Phonics drawing canvas, sight-word memory decks, and AI Illustrated Story Builder.
+  - **Parent Portal**: PIN-protected administration console supporting weekly charts, limits, translation toggles, and cutout prints.
+- **`style.css`**: Design tokens utilizing custom playful fonts (`Fredoka`), active 3D button animations, dark/light color variations, and printer-friendly overrides.
 
 ### 2. Local Service Layer (Proxied via Vite)
-- **TTS Endpoint (`/api/tts`)**: Generates and plays audio streams. Implements client-side URL caches to prevent server spam on double-clicks.
-- **Translate Endpoint (`/api/translate`)**: Translates terms to Vietnamese.
-- **Paint Endpoint (`/api/paint`)**: Queries a hybrid engine:
-  - Returns raw Lucide vector files in under 5ms for standard terms.
-  - Falls back to custom SVG generation using a lightweight 1.5B Qwen-Coder LLM running on CPU.
+- **TTS Endpoint (`/api/tts`)**: Generates audio streams utilizing local speech models, with URL caches to minimize redundant hits.
+- **STT Endpoint (`/api/stt`)**: Captures child pronunciation audio and verifies correctness against target words using local AI speech recognition.
+- **Translate Endpoint (`/api/translate`)**: Translates vocabulary terms to Vietnamese.
+- **Paint Endpoint (`/api/paint`)**: Queries Lucide vectors instantly and falls back to custom SVG generation using a local Qwen-Coder model.
+
+### 3. Advanced Features & Gamification
+- **Smart Learning Engine (SRS)**: Implements adaptive spacing queues for incorrect terms, tracking word mastery metrics (1–5 scale).
+- **Profile Launcher**: Custom profile switcher allowing up to 4 children with unique stats, avatars, companion pets, and level progression.
+- **Reward Cabin & Store**: Shop containing custom pet companions and wearable outfits (astronaut, wizard, ninja, etc.) purchasable with earned Gems.
+- **PWA Integration**: Service worker precaching rules enabling standalone full-screen mobile app support.
+
